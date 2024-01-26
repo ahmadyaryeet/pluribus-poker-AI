@@ -1,8 +1,13 @@
+import ctypes
 import logging
 import time
+import os
 from pathlib import Path
 from typing import Any, Dict, List
+from itertools import combinations
 import concurrent.futures
+import multiprocessing
+import math
 
 import joblib
 import numpy as np
@@ -13,6 +18,7 @@ from tqdm import tqdm
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.game_utility import GameUtility
 from poker_ai.clustering.preflop import compute_preflop_lossless_abstraction
+from poker_ai.poker.evaluation import Evaluator
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
@@ -39,11 +45,12 @@ class CardInfoLutBuilder(CardCombos):
         high_card_rank: int,
         save_dir: str,
     ):
+        self._evaluator = Evaluator()
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
         super().__init__(
-            low_card_rank, high_card_rank,
+            low_card_rank, high_card_rank, save_dir
         )
         card_info_lut_filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
         centroid_filename = f"centroids_{low_card_rank}_to_{high_card_rank}.joblib"
@@ -73,16 +80,19 @@ class CardInfoLutBuilder(CardCombos):
             )
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
         if "river" not in self.card_info_lut:
+            self.load_river()
             self.card_info_lut["river"] = self._compute_river_clusters(
                 n_river_clusters,
             )
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
         if "turn" not in self.card_info_lut:
+            self.load_turn()
             self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
         if "flop" not in self.card_info_lut:
+            self.load_flop()
             self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
@@ -93,19 +103,98 @@ class CardInfoLutBuilder(CardCombos):
         """Compute river clusters and create lookup table."""
         log.info("Starting computation of river clusters.")
         start = time.time()
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            self._river_ehs = list(
-                tqdm(
-                    executor.map(
-                        self.process_river_ehs,
-                        self.river,
-                        chunksize=len(self.river) // 160,
-                    ),
-                    total=len(self.river),
-                )
+
+        river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
+        try:
+            river_ehs = joblib.load(self.ehs_river_path)
+            log.info("loaded river ehs")
+        except FileNotFoundError:
+            self._river_ehs_flat = multiprocessing.Array(
+                ctypes.c_float, river_size * 3
             )
+
+            def process_all(batch, start, result):
+                for i, x in enumerate(batch):
+                    ehs = self.process_river_ehs(x)
+                    result[(start + i) * 3] = ehs[0]
+                    result[(start + i) * 3 + 1] = ehs[1]
+                    result[(start + i) * 3 + 2] = ehs[2]
+            
+            worker_count = multiprocessing.cpu_count()
+            batch_size = min(10_000, river_size // worker_count)
+            cursor = 0
+            max_batch_seconds = None
+            batch_failed = False
+
+            with tqdm(total=river_size, ascii=" >=") as pbar:
+                while True:
+                    task_done = False
+                    
+                    if batch_failed:
+                        batches = cached_batches
+                    else:
+                        batches = []
+                        for _ in range(worker_count):
+                            batch = []
+                            for _ in range(batch_size):
+                                try:
+                                    batch.append(next(self.river))
+                                except StopIteration:
+                                    task_done = True
+                                    break
+                            if len(batch) > 0:
+                                batches.append(batch)
+                    
+                    cached_batches = batches
+                    batch_failed = False
+                    
+                    total_batch_size = 0
+                    processes = []
+
+                    start = time.time()
+                    for batch in batches:
+                        process = multiprocessing.Process(
+                            target=process_all, args=(batch, cursor, self._river_ehs_flat)
+                        )
+                        process.start()
+                        processes.append(process)
+                        total_batch_size += len(batch)
+                        cursor += len(batch)
+                
+                    for process in processes:
+                        if max_batch_seconds is None:
+                            process.join()
+                            continue
+                        process.join(timeout=max_batch_seconds)
+
+                        if process.is_alive():
+                            # Failed to handle this batch.
+                            batch_failed = True
+                            cursor -= total_batch_size
+                            break
+
+                    if batch_failed:
+                        continue
+
+                    end = time.time()
+                    if max_batch_seconds is None:
+                        duration = end - start
+                        max_batch_seconds = int(duration * 3)
+                        log.info(f"Completed first batch of river ehs in {duration:.2f} seconds.")
+                        log.info(f"Setting batch timeout as {max_batch_seconds} seconds.")
+                        
+                    pbar.update(total_batch_size)
+                    
+                    if task_done:
+                        break
+            
+            # Unflatten river ehs
+            log.info(f"Unflattening the array.")
+            river_ehs = np.array(self._river_ehs_flat).reshape(-1, 3)
+            joblib.dump(river_ehs, self.ehs_river_path)
+
         self.centroids["river"], self._river_clusters = self.cluster(
-            num_clusters=n_river_clusters, X=self._river_ehs
+            num_clusters=n_river_clusters, X=river_ehs
         )
         end = time.time()
         log.info(
@@ -126,6 +215,7 @@ class CardInfoLutBuilder(CardCombos):
                         chunksize=len(self.turn) // 160,
                     ),
                     total=len(self.turn),
+                    ascii=" >=",
                 )
             )
         self.centroids["turn"], self._turn_clusters = self.cluster(
@@ -148,6 +238,7 @@ class CardInfoLutBuilder(CardCombos):
                         chunksize=len(self.flop) // 160,
                     ),
                     total=len(self.flop),
+                    ascii=" >=",
                 )
             )
         self.centroids["flop"], self._flop_clusters = self.cluster(
@@ -177,6 +268,55 @@ class CardInfoLutBuilder(CardCombos):
             # increment win rate for winner/tie
             ehs[idx] += 1 / self.n_simulations_river
         return ehs
+    
+    def quick_simulate_get_turn_ehs_distributions(
+        self,
+        public: np.ndarray,
+    ) -> np.ndarray:
+        available_cards = np.array([c for c in self._cards if c not in public])
+        hand_size = len(public) + 1
+        hand_evaluator = self._evaluator.hand_size_map[hand_size]
+
+        prob_unit = 1 / self.n_simulations_turn
+        prob_sub_unit = 1 / self.n_simulations_river
+        ehs: np.ndarray = np.zeros(3)
+        our_hand = np.zeros(len(public) + 1)
+        our_hand[:len(public)] = public
+        opp_hand = np.zeros(len(public) + 1)
+        opp_hand[:len(public)] = public
+
+        turn_ehs_distribution = np.zeros(len(self.centroids["river"]))
+        for _ in range(self.n_simulations_turn):
+            river_card = np.random.choice(available_cards, 1, replace=False)
+            non_river_cards = np.array([c for c in available_cards if c != river_card])
+            our_hand[-1:] = river_card
+            opp_hand[-1:] = river_card
+            
+            for _ in range(self.n_simulations_river):
+                opp_hand[:2] = np.random.choice(non_river_cards, 2, replace=False)
+
+                our_hand_rank = hand_evaluator(our_hand)
+                opp_hand_rank = hand_evaluator(opp_hand)
+                if our_hand_rank > opp_hand_rank:
+                    ehs[0] += prob_sub_unit
+                elif our_hand_rank < opp_hand_rank:
+                    ehs[1] += prob_sub_unit
+                else:
+                    ehs[2] += prob_sub_unit
+            
+            for idx, river_centroid in enumerate(self.centroids["river"]):
+                emd = wasserstein_distance(ehs, river_centroid)
+                if idx == 0:
+                    min_idx = idx
+                    min_emd = emd
+                else:
+                    if emd < min_emd:
+                        min_idx = idx
+                        min_emd = emd
+            # now increment the cluster to which it belongs -
+            turn_ehs_distribution[min_idx] += prob_unit
+    
+        return turn_ehs_distribution
 
     def simulate_get_turn_ehs_distributions(
         self,
@@ -238,11 +378,25 @@ class CardInfoLutBuilder(CardCombos):
         -------
             Expected hand strength
         """
-        our_hand = public[:2]
-        board = public[2:7]
-        # Get expected hand strength
-        game = GameUtility(our_hand=our_hand, board=board, cards=self._cards)
-        return self.simulate_get_ehs(game)
+        # our_hand = public[:2]
+        # board = public[2:7]
+
+        our_hand_rank = self._evaluator._seven(public)
+        available_cards = np.array([c for c in self._cards if c not in public])
+        
+        prob_unit = 1 / self.n_simulations_river
+        ehs: np.ndarray = np.zeros(3)
+        opp_hand = public.copy()
+        for _ in range(self.n_simulations_river):
+            opp_hand[:2] = np.random.choice(available_cards, 2, replace=False)
+            opp_hand_rank = self._evaluator._seven(opp_hand)
+            if our_hand_rank > opp_hand_rank:
+                ehs[0] += prob_unit
+            elif our_hand_rank < opp_hand_rank:
+                ehs[1] += prob_unit
+            else:
+                ehs[2] += prob_unit
+        return ehs
 
     @staticmethod
     def get_available_cards(
@@ -262,7 +416,7 @@ class CardInfoLutBuilder(CardCombos):
             Available cards
         """
         # Turn into set for O(1) lookup speed.
-        unavailable_cards = set(unavailable_cards.tolist())
+        unavailable_cards = set(unavailable_cards)
         return np.array([c for c in cards if c not in unavailable_cards])
 
     def process_turn_ehs_distributions(self, public: np.ndarray) -> np.ndarray:
@@ -282,8 +436,8 @@ class CardInfoLutBuilder(CardCombos):
             cards=self._cards, unavailable_cards=public
         )
         # sample river cards and run a simulation
-        turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(
-            available_cards, the_board=public[2:6], our_hand=public[:2],
+        turn_ehs_distribution = self.quick_simulate_get_turn_ehs_distributions(
+            available_cards, public,
         )
         return turn_ehs_distribution
 
@@ -306,18 +460,18 @@ class CardInfoLutBuilder(CardCombos):
             cards=self._cards, unavailable_cards=public
         )
         potential_aware_distribution_flop = np.zeros(len(self.centroids["turn"]))
+        extended_public = np.zeros(len(public) + 1)
+        extended_public[:-1] = public
         for j in range(self.n_simulations_flop):
             # randomly generating turn
             turn_card = np.random.choice(available_cards, 1, replace=False)
-            our_hand = public[:2]
-            board = public[2:5]
-            the_board = np.append(board, turn_card).tolist()
+            extended_public[-1:] = turn_card
             # getting available cards
             available_cards_turn = np.array(
                 [x for x in available_cards if x != turn_card[0]]
             )
-            turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(
-                available_cards_turn, the_board=the_board, our_hand=our_hand,
+            turn_ehs_distribution = self.quick_simulate_get_turn_ehs_distributions(
+                available_cards_turn, extended_public,
             )
             for idx, turn_centroid in enumerate(self.centroids["turn"]):
                 # earth mover distance

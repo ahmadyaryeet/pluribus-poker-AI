@@ -1,13 +1,15 @@
 import logging
+import os
+import math
+from pathlib import Path
 from typing import List
 from itertools import combinations
-import operator
 
+import joblib
 import numpy as np
 from tqdm import tqdm
 
-from poker_ai.poker.card import Card
-from poker_ai.poker.deck import get_all_suits
+from poker_ai.poker.evaluation.eval_card import EvaluationCard
 
 
 log = logging.getLogger("poker_ai.clustering.runner")
@@ -17,34 +19,120 @@ class CardCombos:
     """This class stores combinations of cards (histories) per street."""
 
     def __init__(
-        self, low_card_rank: int, high_card_rank: int,
+        self, low_card_rank: int, high_card_rank: int, save_dir: str
     ):
         super().__init__()
         # Sort for caching.
-        suits: List[str] = sorted(list(get_all_suits()))
-        ranks: List[int] = sorted(list(range(low_card_rank, high_card_rank + 1)))
+        eval_suits = "shdc"
+        eval_ranks: List[str] = [
+            EvaluationCard.STR_RANKS[rank - 2]
+            for rank in range(low_card_rank, high_card_rank + 1)
+        ]
+        
         self._cards = np.array(
-            [Card(rank, suit) for suit in suits for rank in ranks]
+            [
+                EvaluationCard.new(rank_char + suit_char)
+                for suit_char in eval_suits
+                for rank_char in eval_ranks
+            ],
         )
-        # DEBUG
-        print("CARDS:", self._cards)
-        self.starting_hands = self.get_card_combos(2)
-        self.flop = self.create_info_combos(
-            self.starting_hands, self.get_card_combos(3)
-        )
-        log.info("created flop")
-        self.turn = self.create_info_combos(
-            self.starting_hands, self.get_card_combos(4)
-        )
-        log.info("created turn")
-        self.river = self.create_info_combos(
-            self.starting_hands, self.get_card_combos(5)
-        )
-        # DEBUG
-        print("SIZE OF RIVER:", len(self.river))
-        log.info("created river")
+        self._sorted_cards = self._cards.copy()
+        self._sorted_cards.sort()
 
-    def get_card_combos(self, num_cards: int) -> np.ndarray:
+        self.starting_hands = self.get_card_combos(2)
+
+        card_combos_flop_filename = f"card_combos_flop_{low_card_rank}_to_{high_card_rank}.joblib"
+        self.card_combos_flop_path: Path = Path(save_dir) / card_combos_flop_filename
+        card_combos_turn_filename = f"card_combos_turn_{low_card_rank}_to_{high_card_rank}.joblib"
+        self.card_combos_turn_path: Path = Path(save_dir) / card_combos_turn_filename
+        card_combos_river_filename = f"card_combos_river_{low_card_rank}_to_{high_card_rank}.joblib"
+        self.card_combos_river_path: Path = Path(save_dir) / card_combos_river_filename
+
+        card_combos_flop_csv_filename = f"card_combos_flop_csv_{low_card_rank}_to_{high_card_rank}.csv"
+        self.card_combos_flop_csv_path: Path = Path(save_dir) / card_combos_flop_csv_filename
+        card_combos_turn_csv_filename = f"card_combos_turn_csv_{low_card_rank}_to_{high_card_rank}.csv"
+        self.card_combos_turn_csv_path: Path = Path(save_dir) / card_combos_turn_csv_filename
+        card_combos_river_csv_filename = f"card_combos_river_csv_{low_card_rank}_to_{high_card_rank}.csv"
+        self.card_combos_river_csv_path: Path = Path(save_dir) / card_combos_river_csv_filename
+
+        ehs_river_filename = f"ehs_river_{low_card_rank}_to_{high_card_rank}.joblib"
+        self.ehs_river_path: Path = Path(save_dir) / ehs_river_filename
+
+        # ehs_flop_csv_filename = f"ehs_flop_csv_{low_card_rank}_to_{high_card_rank}.csv"
+        # self.ehs_flop_csv_path: Path = Path(save_dir) / ehs_flop_csv_filename
+        # ehs_turn_csv_filename = f"ehs_turn_csv_{low_card_rank}_to_{high_card_rank}.csv"
+        # self.ehs_turn_csv_path: Path = Path(save_dir) / ehs_turn_csv_filename
+        # ehs_river_csv_filename = f"ehs_river_csv_{low_card_rank}_to_{high_card_rank}.csv"
+        # self.ehs_river_csv_path: Path = Path(save_dir) / ehs_river_csv_filename
+
+    def load_river(self):
+        # if os.path.exists(self.card_combos_river_path) and not os.path.exists(self.card_combos_river_csv_path):
+        #     river = joblib.load(self.card_combos_river_path)
+        #     log.info("converting river")
+        #     with open(self.card_combos_river_csv_path, "w") as f:
+        #         for row in tqdm(river, ascii=" >="):
+        #             for i in range(len(row)):
+        #                 f.write(str(int(row[i])))
+        #                 if i < len(row) - 1:
+        #                     f.write(",")
+        #             f.write("\n")
+        # elif not os.path.exists(self.card_combos_river_csv_path):
+        #     self.write_info_combos(self.starting_hands, 5, self.card_combos_river_csv_path)
+        #     log.info("created river")
+        # else:
+        #     log.info("using pre-written river")
+
+        self.river = self.create_info_combos_iter(self.starting_hands, 5)
+
+    def load_turn(self):
+        # if os.path.exists(self.card_combos_turn_path) and not os.path.exists(self.card_combos_turn_csv_path):
+        #     turn = joblib.load(self.card_combos_turn_path)
+        #     log.info("converting turn")
+        #     with open(self.card_combos_turn_csv_path, "w") as f:
+        #         for row in tqdm(turn, ascii=" >="):
+        #             f.write(",".join([str(int(x)) for x in row]) + "\n")
+        #     os.remove(self.card_combos_turn_path)
+        # elif not os.path.exists(self.card_combos_turn_csv_path):
+        #     self.write_info_combos(self.starting_hands, 3, self.card_combos_turn_csv_path)
+        #     log.info("created turn")
+        # else:
+        #     log.info("using pre-written turn")
+
+        try:
+            self.turn = joblib.load(self.card_combos_turn_path)
+            log.info("loaded turn")
+        except FileNotFoundError:
+            self.turn = self.create_info_combos(
+                self.starting_hands, 4
+            )
+            joblib.dump(self.turn, self.card_combos_turn_path)
+        
+    def load_flop(self):
+        # if os.path.exists(self.card_combos_flop_path) and not os.path.exists(self.card_combos_flop_csv_path):
+        #     flop = joblib.load(self.card_combos_flop_path)
+        #     log.info("converting flop")
+        #     with open(self.card_combos_flop_csv_path, "w") as f:
+        #         for row in tqdm(flop, ascii=" >="):
+        #             f.write(",".join([str(int(x)) for x in row]) + "\n")
+        #     os.remove(self.card_combos_flop_path)
+        # elif not os.path.exists(self.card_combos_flop_csv_path):
+        #     self.write_info_combos(self.starting_hands, 3, self.card_combos_flop_csv_path)
+        #     log.info("created flop")
+        # else:
+        #     log.info("using pre-written flop")
+
+        try:
+            self.flop = joblib.load(self.card_combos_flop_path)
+            log.info("loaded flop")
+        except FileNotFoundError:
+            self.flop = self.create_info_combos(
+                self.starting_hands, 3
+            )
+            joblib.dump(self.flop, self.card_combos_flop_path)
+
+    def get_card_combos(
+        self, num_cards: int
+    ) -> np.ndarray:
         """
         Get the card combinations for a given street.
 
@@ -57,10 +145,66 @@ class CardCombos:
         -------
             Combos of cards (Card) -> np.ndarray
         """
-        return np.array([c for c in combinations(self._cards, num_cards)])
+        combos = np.array([c for c in combinations(self._sorted_cards, num_cards)])
+
+        return combos
+
+    def create_info_combos_iter(
+        self, start_combos: np.ndarray, public_num_cards: int
+    ):
+        hand_size = len(start_combos[0]) + public_num_cards
+
+        for start_combo in start_combos:
+            publics = np.array(
+                [
+                    c for c in combinations(
+                        [c for c in self._sorted_cards if c not in start_combo],
+                        public_num_cards,
+                    )
+                ]
+            )
+            for public_combo in publics:
+                combo = np.zeros(hand_size, dtype=int)
+                combo[:2] = start_combo[::-1]
+                combo[2:] = public_combo[::-1]
+                
+                yield combo
+    
+    def write_info_combos(
+        self, start_combos: np.ndarray, public_num_cards: int, output_path: str
+    ):
+        if public_num_cards == 3:
+            betting_stage = "flop"
+        elif public_num_cards == 4:
+            betting_stage = "turn"
+        elif public_num_cards == 5:
+            betting_stage = "river"
+        else:
+            betting_stage = "unknown"
+
+        with open(output_path, "w") as f:
+            for start_combo in tqdm(
+                start_combos,
+                dynamic_ncols=True,
+                desc=f"Creating {betting_stage} info combos into a file",
+                ascii=" >=",
+            ):
+                publics = np.array(
+                    [
+                        c for c in combinations(
+                            [c for c in self._sorted_cards if c not in start_combo],
+                            public_num_cards,
+                        )
+                    ]
+                )
+                for public_combo in publics:
+                    f.write(",".join([str(int(x)) for x in start_combo[::-1]]))
+                    f.write(",")
+                    f.write(",".join([str(int(x)) for x in public_combo[::-1]]))
+                    f.write("\n")
 
     def create_info_combos(
-        self, start_combos: np.ndarray, publics: np.ndarray
+        self, start_combos: np.ndarray, public_num_cards: int
     ) -> np.ndarray:
         """Combinations of private info(hole cards) and public info (board).
 
@@ -79,37 +223,37 @@ class CardCombos:
             Combinations of private information (hole cards) and public
             information (board)
         """
-        if publics.shape[1] == 3:
+        if public_num_cards == 3:
             betting_stage = "flop"
-        elif publics.shape[1] == 4:
+        elif public_num_cards == 4:
             betting_stage = "turn"
-        elif publics.shape[1] == 5:
+        elif public_num_cards == 5:
             betting_stage = "river"
         else:
             betting_stage = "unknown"
-        our_cards: List[Card] = []
-        for combos in tqdm(
+        
+        max_count = len(start_combos) * math.comb(len(self._cards) - len(start_combos[0]), public_num_cards)
+        hand_size = len(start_combos[0]) + public_num_cards
+        our_cards = np.zeros((max_count, hand_size))
+        cursor = 0
+
+        for start_combo in tqdm(
             start_combos,
             dynamic_ncols=True,
             desc=f"Creating {betting_stage} info combos",
+            ascii=" >=",
         ):
-            # Descending sort combos.
-            sorted_combos: List[Card] = sorted(
-                list(combos),
-                key=operator.attrgetter("eval_card"),
-                reverse=True,
+            publics = np.array(
+                [
+                    c for c in combinations(
+                        [c for c in self._sorted_cards if c not in start_combo],
+                        public_num_cards,
+                    )
+                ]
             )
             for public_combo in publics:
-                # Descending sort public_combo.
-                sorted_public_combo: List[Card] = sorted(
-                    list(public_combo),
-                    key=operator.attrgetter("eval_card"),
-                    reverse=True,
-                )
-                if not np.any(np.isin(sorted_combos, sorted_public_combo)):
-                    # Combine hand and public cards.
-                    hand: np.array = np.array(
-                        sorted_combos + sorted_public_combo
-                    )
-                    our_cards.append(hand)
-        return np.array(our_cards)
+                our_cards[cursor][:2] = start_combo[::-1]
+                our_cards[cursor][2:] = public_combo[::-1]
+                cursor += 1
+
+        return our_cards
