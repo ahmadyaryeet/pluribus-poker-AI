@@ -151,6 +151,10 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of clusters.")
         start = time.time()
         
+        # Ensure the directories exist
+        self.card_info_lut_path.parent.mkdir(parents=True, exist_ok=True)
+        self.centroid_path.parent.mkdir(parents=True, exist_ok=True)
+
         try:
             if "pre_flop" not in self.card_info_lut:
                 self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(builder=self)
@@ -161,10 +165,15 @@ class CardInfoLutBuilder(CardCombos):
             if "river" not in self.card_info_lut:
                 self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
                 log.info("Dumping river card_info_lut and centroids.")
+                # Break down the dumping process
+                log.info(f"Size of card_info_lut['river']: {len(self.card_info_lut['river'])}")
+                log.info(f"Size of centroids['river']: {len(self.centroids['river'])}")
+                for key, value in self.card_info_lut.items():
+                    log.info(f"Dumping key: {key} with size: {len(value)}")
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
-                log.info("dumped first succesfully river test")
+                log.info("Dumped card_info_lut successfully.")
                 joblib.dump(self.centroids, self.centroid_path)
-                log.info("Dumped river card_info_lut and centroids successfully.")
+                log.info("Dumped centroids successfully.")
             
             if "turn" not in self.card_info_lut:
                 self.load_turn()
