@@ -160,6 +160,7 @@ class CardInfoLutBuilder(CardCombos):
             log.info("Breakpoint to see if the error is in joblib dumping or above")
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
+            log.info("Breakpoint to see if the error is in joblib dumping or above 2")
         if "turn" not in self.card_info_lut:
             self.load_turn()
             self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
