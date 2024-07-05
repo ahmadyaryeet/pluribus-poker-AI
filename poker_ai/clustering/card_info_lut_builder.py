@@ -150,27 +150,42 @@ class CardInfoLutBuilder(CardCombos):
         """
         log.info("Starting computation of clusters.")
         start = time.time()
-        if "pre_flop" not in self.card_info_lut:
-            self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(
-                builder=self
-            )
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-        if "river" not in self.card_info_lut:
-            self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
-            log.info("Breakpoint to see if the error is in joblib dumping or above")
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-            joblib.dump(self.centroids, self.centroid_path)
-            log.info("Breakpoint to see if the error is in joblib dumping or above 2")
-        if "turn" not in self.card_info_lut:
-            self.load_turn()
-            self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-            joblib.dump(self.centroids, self.centroid_path)
-        if "flop" not in self.card_info_lut:
-            self.load_flop()
-            self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-            joblib.dump(self.centroids, self.centroid_path)
+        
+        try:
+            if "pre_flop" not in self.card_info_lut:
+                self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(builder=self)
+                log.info("Dumping pre_flop card_info_lut.")
+                joblib.dump(self.card_info_lut, self.card_info_lut_path)
+                log.info("Dumped pre_flop card_info_lut successfully.")
+            
+            if "river" not in self.card_info_lut:
+                self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
+                log.info("Dumping river card_info_lut and centroids.")
+                joblib.dump(self.card_info_lut, self.card_info_lut_path)
+                log.info("dumped first succesfully river test")
+                joblib.dump(self.centroids, self.centroid_path)
+                log.info("Dumped river card_info_lut and centroids successfully.")
+            
+            if "turn" not in self.card_info_lut:
+                self.load_turn()
+                self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
+                log.info("Dumping turn card_info_lut and centroids.")
+                joblib.dump(self.card_info_lut, self.card_info_lut_path)
+                joblib.dump(self.centroids, self.centroid_path)
+                log.info("Dumped turn card_info_lut and centroids successfully.")
+            
+            if "flop" not in self.card_info_lut:
+                self.load_flop()
+                self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
+                log.info("Dumping flop card_info_lut and centroids.")
+                joblib.dump(self.card_info_lut, self.card_info_lut_path)
+                joblib.dump(self.centroids, self.centroid_path)
+                log.info("Dumped flop card_info_lut and centroids successfully.")
+            
+        except Exception as e:
+            log.error(f"Error during computation or dumping: {e}")
+            raise
+        
         end = time.time()
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
