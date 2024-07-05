@@ -156,9 +156,7 @@ class CardInfoLutBuilder(CardCombos):
             )
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
         if "river" not in self.card_info_lut:
-            self.card_info_lut["river"] = self._compute_river_clusters(
-                n_river_clusters,
-            )
+            self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
         if "turn" not in self.card_info_lut:
@@ -516,4 +514,5 @@ class CardInfoLutBuilder(CardCombos):
         lossy_lookup = {}
         for i, card_combo in enumerate(tqdm(card_combos, ascii=" >=", total=card_combos_size)):
             lossy_lookup[tuple(card_combo)] = clusters[i]
+        log.info("Finished creating lookup table")
         return lossy_lookup
