@@ -300,8 +300,10 @@ class ShortDeckPokerState:
     def load_card_lut(
         lut_path: str = ".",
         pickle_dir: bool = False,
-        low_card_rank: int = 2,
-        high_card_rank: int = 14,
+        #editing these values from static values to being from 2 to 7, and 14 to 11.
+
+        low_card_rank: int = 7,
+        high_card_rank: int = 11,
     ) -> Dict[str, Dict[Tuple[int, ...], str]]:
         """
         Load card information lookup table.
