@@ -157,6 +157,7 @@ class CardInfoLutBuilder(CardCombos):
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
         if "river" not in self.card_info_lut:
             self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
+            log.info("Breakpoint to see if the error is in joblib dumping or above")
             joblib.dump(self.card_info_lut, self.card_info_lut_path)
             joblib.dump(self.centroids, self.centroid_path)
         if "turn" not in self.card_info_lut:
