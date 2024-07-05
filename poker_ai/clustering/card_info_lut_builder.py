@@ -4,6 +4,8 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import os
+import psutil
 import joblib
 import numpy as np
 from sklearn.cluster import KMeans
@@ -140,6 +142,11 @@ class CardInfoLutBuilder(CardCombos):
         joblib.dump(self.card_info_lut, self.card_info_lut_path)
         joblib.dump(self.centroids, self.centroid_path)
 
+    def log_memory_usage():
+        process = psutil.Process(os.getpid())
+        mem_info = process.memory_info()
+        log.info(f"Memory usage: RSS={mem_info.rss / (1024 ** 2):.2f} MB, VMS={mem_info.vms / (1024 ** 2):.2f} MB")
+    
     def compute(
         self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int,
     ):
@@ -161,15 +168,16 @@ class CardInfoLutBuilder(CardCombos):
                 log.info("Dumping pre_flop card_info_lut.")
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 log.info("Dumped pre_flop card_info_lut successfully.")
+                log_memory_usage()
             
             if "river" not in self.card_info_lut:
                 self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
                 log.info("Dumping river card_info_lut and centroids.")
-                # Break down the dumping process
                 log.info(f"Size of card_info_lut['river']: {len(self.card_info_lut['river'])}")
                 log.info(f"Size of centroids['river']: {len(self.centroids['river'])}")
                 for key, value in self.card_info_lut.items():
                     log.info(f"Dumping key: {key} with size: {len(value)}")
+                log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 log.info("Dumped card_info_lut successfully.")
                 joblib.dump(self.centroids, self.centroid_path)
@@ -179,6 +187,7 @@ class CardInfoLutBuilder(CardCombos):
                 self.load_turn()
                 self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
                 log.info("Dumping turn card_info_lut and centroids.")
+                log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 joblib.dump(self.centroids, self.centroid_path)
                 log.info("Dumped turn card_info_lut and centroids successfully.")
@@ -187,16 +196,18 @@ class CardInfoLutBuilder(CardCombos):
                 self.load_flop()
                 self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
                 log.info("Dumping flop card_info_lut and centroids.")
+                log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 joblib.dump(self.centroids, self.centroid_path)
                 log.info("Dumped flop card_info_lut and centroids successfully.")
-            
+        
         except Exception as e:
             log.error(f"Error during computation or dumping: {e}")
             raise
-        
+    
         end = time.time()
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
+
 
     def _compute_river_clusters(self, n_river_clusters: int):
         """Compute river clusters and create lookup table."""
