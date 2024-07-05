@@ -120,7 +120,8 @@ def resume(server_config_path: str):
 @train.command()
 @click.option(
     "--low_card_rank",
-    default=2,
+    #default=2,
+    default=7,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
@@ -128,7 +129,8 @@ def resume(server_config_path: str):
 )
 @click.option(
     "--high_card_rank",
-    default=14,
+    #default=14,
+    default=11,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
