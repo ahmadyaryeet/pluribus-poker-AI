@@ -142,7 +142,7 @@ class CardInfoLutBuilder(CardCombos):
         joblib.dump(self.card_info_lut, self.card_info_lut_path)
         joblib.dump(self.centroids, self.centroid_path)
 
-    def log_memory_usage():
+    def log_memory_usage(self):
         process = psutil.Process(os.getpid())
         mem_info = process.memory_info()
         log.info(f"Memory usage: RSS={mem_info.rss / (1024 ** 2):.2f} MB, VMS={mem_info.vms / (1024 ** 2):.2f} MB")
