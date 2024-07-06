@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+import pickle
 import os
 import psutil
 import joblib
@@ -178,11 +179,11 @@ class CardInfoLutBuilder(CardCombos):
                 for key, value in self.card_info_lut.items():
                     log.info(f"Dumping key: {key} with size: {len(value)}")
                 self.log_memory_usage()
-                #joblib.dump(self.card_info_lut, self.card_info_lut_path)
-                joblib.dump(self.card_info_lut, self.card_info_lut_path, compress=('gzip', 3))
+                with open(self.card_info_lut_path, 'wb') as f:
+                    pickle.dump(self.card_info_lut, f)
                 log.info("Dumped card_info_lut successfully.")
-                joblib.dump(self.centroids, self.centroid_path, compress=('gzip', 3))
-                # joblib.dump(self.centroids, self.centroid_path)
+                with open(self.centroid_path, 'wb') as f:
+                    pickle.dump(self.centroids, f)
                 log.info("Dumped centroids successfully.")
             
             if "turn" not in self.card_info_lut:
