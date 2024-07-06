@@ -140,8 +140,10 @@ class CardInfoLutBuilder(CardCombos):
         )
         self.centroids["flop"] = self.load_raw_centroids(raw_flop_centroids_path)
 
-        joblib.dump(self.card_info_lut, self.card_info_lut_path)
-        joblib.dump(self.centroids, self.centroid_path)
+        with open(self.card_info_lut_path, 'wb') as f:
+            pickle.dump(self.card_info_lut, f)
+        with open(self.centroid_path, 'wb') as f:
+            pickle.dump(self.centroids, f)
 
     def log_memory_usage(self):
         process = psutil.Process(os.getpid())
@@ -167,7 +169,8 @@ class CardInfoLutBuilder(CardCombos):
             if "pre_flop" not in self.card_info_lut:
                 self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(builder=self)
                 log.info("Dumping pre_flop card_info_lut.")
-                joblib.dump(self.card_info_lut, self.card_info_lut_path)
+                with open(self.card_info_lut_path, 'wb') as f:
+                    pickle.dump(self.card_info_lut, f)
                 log.info("Dumped pre_flop card_info_lut successfully.")
                 self.log_memory_usage()
             
@@ -191,8 +194,10 @@ class CardInfoLutBuilder(CardCombos):
                 self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
                 log.info("Dumping turn card_info_lut and centroids.")
                 self.log_memory_usage()
-                joblib.dump(self.card_info_lut, self.card_info_lut_path)
-                joblib.dump(self.centroids, self.centroid_path)
+                with open(self.card_info_lut_path, 'wb') as f:
+                    pickle.dump(self.card_info_lut, f)
+                with open(self.centroid_path, 'wb') as f:
+                    pickle.dump(self.centroids, f)
                 log.info("Dumped turn card_info_lut and centroids successfully.")
             
             if "flop" not in self.card_info_lut:
@@ -200,8 +205,10 @@ class CardInfoLutBuilder(CardCombos):
                 self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
                 log.info("Dumping flop card_info_lut and centroids.")
                 self.log_memory_usage()
-                joblib.dump(self.card_info_lut, self.card_info_lut_path)
-                joblib.dump(self.centroids, self.centroid_path)
+                with open(self.card_info_lut_path, 'wb') as f:
+                    pickle.dump(self.card_info_lut, f)
+                with open(self.centroid_path, 'wb') as f:
+                    pickle.dump(self.centroids, f)
                 log.info("Dumped flop card_info_lut and centroids successfully.")
         
         except Exception as e:
@@ -212,6 +219,7 @@ class CardInfoLutBuilder(CardCombos):
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
 
+    
     def _compute_river_clusters(self, n_river_clusters: int):
         """Compute river clusters and create lookup table."""
         log.info("Starting computation of river clusters.")
@@ -230,7 +238,8 @@ class CardInfoLutBuilder(CardCombos):
             river_ehs, river_ehs_sm = multiprocess_ehs_calc(
                 self.river, batch_tasker, river_size
             )
-            joblib.dump(river_ehs, self.ehs_river_path)
+            with open(self.ehs_river_path, 'wb') as f:
+                pickle.dump(river_ehs, f)
 
         self.centroids["river"], self._river_clusters = self.cluster(
             num_clusters=n_river_clusters, X=river_ehs
@@ -302,7 +311,7 @@ class CardInfoLutBuilder(CardCombos):
         ehs_sm.unlink()
 
         return self.create_card_lookup(self._flop_clusters, self.flop)
-
+   
     def simulate_get_ehs(self, game: GameUtility,) -> np.ndarray:
         """
         Get expected hand strength object.
