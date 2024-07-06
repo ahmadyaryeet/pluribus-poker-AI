@@ -177,7 +177,7 @@ class CardInfoLutBuilder(CardCombos):
                 log.info(f"Size of centroids['river']: {len(self.centroids['river'])}")
                 for key, value in self.card_info_lut.items():
                     log.info(f"Dumping key: {key} with size: {len(value)}")
-                se;f.log_memory_usage()
+                self.log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 log.info("Dumped card_info_lut successfully.")
                 joblib.dump(self.centroids, self.centroid_path)
