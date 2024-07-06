@@ -8,7 +8,7 @@ import operator
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
-import joblib
+import pickle
 
 from poker_ai import utils
 from poker_ai.clustering.lookup_client import LookupClient
@@ -341,7 +341,7 @@ class ShortDeckPokerState:
                         f"set to directory containing pickle files"
                     )
                 with open(file_path, "rb") as fp:
-                    card_info_lut[betting_stage] = joblib.load(fp)
+                    card_info_lut[betting_stage] = pickle.load(fp)
         elif lut_path and lut_path.startswith("lut://"):
             logger.info(f"Connecting to a card information lut server: {lut_path}")
             card_info_lut = LookupClient(
@@ -353,7 +353,8 @@ class ShortDeckPokerState:
         elif lut_path:
             logger.info(f"Loading card from single file at path: {lut_path}")
             filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
-            card_info_lut = joblib.load(lut_path + "/" + filename)
+            with open(lut_path + "/" + filename, 'rb') as f:
+                card_info_lut = pickle.load(f)
         else:
             card_info_lut = {}
         return card_info_lut
