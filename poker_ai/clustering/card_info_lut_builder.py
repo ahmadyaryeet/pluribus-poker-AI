@@ -168,7 +168,7 @@ class CardInfoLutBuilder(CardCombos):
                 log.info("Dumping pre_flop card_info_lut.")
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 log.info("Dumped pre_flop card_info_lut successfully.")
-                log_memory_usage()
+                self.log_memory_usage()
             
             if "river" not in self.card_info_lut:
                 self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
@@ -177,7 +177,7 @@ class CardInfoLutBuilder(CardCombos):
                 log.info(f"Size of centroids['river']: {len(self.centroids['river'])}")
                 for key, value in self.card_info_lut.items():
                     log.info(f"Dumping key: {key} with size: {len(value)}")
-                log_memory_usage()
+                se;f.log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 log.info("Dumped card_info_lut successfully.")
                 joblib.dump(self.centroids, self.centroid_path)
@@ -187,7 +187,7 @@ class CardInfoLutBuilder(CardCombos):
                 self.load_turn()
                 self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
                 log.info("Dumping turn card_info_lut and centroids.")
-                log_memory_usage()
+                self.log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 joblib.dump(self.centroids, self.centroid_path)
                 log.info("Dumped turn card_info_lut and centroids successfully.")
@@ -196,7 +196,7 @@ class CardInfoLutBuilder(CardCombos):
                 self.load_flop()
                 self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
                 log.info("Dumping flop card_info_lut and centroids.")
-                log_memory_usage()
+                self.log_memory_usage()
                 joblib.dump(self.card_info_lut, self.card_info_lut_path)
                 joblib.dump(self.centroids, self.centroid_path)
                 log.info("Dumped flop card_info_lut and centroids successfully.")
