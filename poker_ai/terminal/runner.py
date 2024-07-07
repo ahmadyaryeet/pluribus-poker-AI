@@ -19,7 +19,7 @@ from poker_ai.utils.algos import rotate_list
 @click.command()
 @click.option(
     "--low_card_rank",
-    default=2,
+    default=7,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
@@ -27,7 +27,7 @@ from poker_ai.utils.algos import rotate_list
 )
 @click.option(
     "--high_card_rank",
-    default=14,
+    default=11,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
