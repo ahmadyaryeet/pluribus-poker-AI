@@ -352,7 +352,8 @@ class ShortDeckPokerState:
             card_info_lut.connect()
         elif lut_path:
             logger.info(f"Loading card from single file at path: {lut_path}")
-            filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
+            #filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
+            filename = f"card_info_lut_7_to_11.joblib"
             with open(lut_path + "/" + filename, 'rb') as f:
                 card_info_lut = pickle.load(f)
         else:
