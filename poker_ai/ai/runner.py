@@ -108,6 +108,7 @@ def resume(server_config_path: str):
     """
     try:
         config = joblib.load(server_config_path)
+        log.info("Loaded saved config file")
     except FileNotFoundError:
         raise FileNotFoundError(
             f"Server config file not found at the path: {server_config_path}\n "
@@ -143,7 +144,8 @@ def resume(server_config_path: str):
 )
 @click.option(
     "--n_iterations",
-    default=1500,
+    default=500,
+    #default = 1500,
     help="The total number of iterations we should train the model for.",
 )
 @click.option(
