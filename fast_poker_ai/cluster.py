@@ -8,7 +8,7 @@ import numpy as np
 
 from eval_card import EvaluationCard
 
-
+#pokemon
 def create_deck(low_rank: int, high_rank: int):
     base_suits = "shdc"
     base_ranks = "23456789TJQKA"
