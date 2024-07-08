@@ -109,7 +109,7 @@ def create_game_action(request: Request, gid: int, body: CreateActionRequest):
 )
 @click.option(
     "--low_card_rank",
-    default=2,
+    default=4,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
