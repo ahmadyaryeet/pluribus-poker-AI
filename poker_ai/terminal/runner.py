@@ -37,6 +37,7 @@ from poker_ai.utils.algos import rotate_list
 @click.option('--pickle_dir', required=False, default=False, type=bool)
 @click.option('--agent', required=False, default="offline", type=str)
 @click.option('--strategy_path', required=False, default="", type=str)
+@click.option('--previous_strategy_path', required=False, default="", type=str)
 @click.option('--debug_quick_start/--no_debug_quick_start', default=False)
 def run_terminal_app(
     low_card_rank: int,
@@ -45,6 +46,7 @@ def run_terminal_app(
     pickle_dir: bool,
     agent: str = "offline",
     strategy_path: str = "",
+    previous_strategy_path: str = "",
     debug_quick_start: bool = False
 ):
     """Start up terminal app to play against your poker AI.
@@ -215,5 +217,163 @@ def run_terminal_app(
                 state: ShortDeckPokerState = state.apply_action(action)
 
 
+def select_runner():
+    user_input = input("Type '1' if you want to play against the AI, Type '2' if you want the Ai to play against a previous version of itself: ")
+    if user_input == '1':
+        run_terminal_app()
+    elif user_input == '2':
+        run_progress_checker()
+    
+def run_progress_checker(
+    low_card_rank: int,
+    high_card_rank: int,
+    lut_path: str,
+    pickle_dir: bool,
+    agent: str = "offline",
+    strategy_path: str = "",
+    previous_strategy_path: str = "",
+    debug_quick_start: bool = False
+):
+    term = Terminal()
+    log = AsciiLogger(term)
+    log.info("Running progress checker...")
+
+    # Load the current strategy
+    current_strategy_dict = joblib.load(strategy_path)
+    current_strategy = current_strategy_dict['strategy']
+
+    # Load the previous strategy
+    previous_strategy_dict = joblib.load(previous_strategy_path)
+    previous_strategy = previous_strategy_dict['strategy']
+
+    positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
+    names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "Current AI"}
+
+    n_players = 6
+    state: ShortDeckPokerState = new_game(
+        n_players=n_players,
+        include_ranks=list(range(low_card_rank, high_card_rank + 1)),
+        lut_path=lut_path,
+        pickle_dir=pickle_dir
+    )
+
+    n_table_rotations: int = 0
+    selected_action_i: int = 0
+    user_results: UserResults = UserResults()
+
+    with term.cbreak(), term.hidden_cursor():
+        while True:
+            ascii_players: Dict[str, AsciiPlayer] = {}
+            state_players = rotate_list(state.players[::-1], n_table_rotations)
+            og_name_to_position = {}
+            og_name_to_name = {}
+            for player_i, player in enumerate(state_players):
+                position = positions[player_i]
+                is_current_ai = names[position].lower() == "current ai"
+                ascii_players[position] = AsciiPlayer(
+                    *player.cards,
+                    term=term,
+                    name=names[position],
+                    og_name=player.name,
+                    hide_cards=not is_current_ai and not state.is_terminal,
+                    folded=not player.is_active,
+                    is_turn=player.is_turn,
+                    chips_in_pot=player.n_bet_chips,
+                    chips_in_bank=player.n_chips,
+                    is_small_blind=player.is_small_blind,
+                    is_big_blind=player.is_big_blind,
+                    is_dealer=player.is_dealer,
+                )
+                og_name_to_position[player.name] = position
+                og_name_to_name[player.name] = names[position]
+                if player.is_turn:
+                    current_player_name = names[position]
+
+            public_cards = AsciiCardCollection(*state.community_cards)
+            if state.is_terminal:
+                legal_actions = ["quit", "new game"]
+                human_should_interact = True
+            else:
+                og_current_name = state.current_player.name
+                human_should_interact = names[og_name_to_position[og_current_name]].lower() == "current ai"
+                if human_should_interact:
+                    legal_actions = state.legal_actions
+                else:
+                    legal_actions = []
+
+            # Render game
+            print(term.home + term.white + term.clear)
+            print_header(term, state, og_name_to_name)
+            print_table(
+                term,
+                ascii_players,
+                public_cards,
+                n_table_rotations,
+                n_chips_in_pot=state._table.pot.total,
+            )
+            print_footer(term, selected_action_i, legal_actions)
+            print_log(term, log)
+
+            # Make action of some kind
+            if human_should_interact:
+                selected_action_i %= len(legal_actions)
+                key = term.inkey(timeout=None)
+                if key.name == "q":
+                    log.info(term.pink("quit"))
+                    break
+                elif key.name == "KEY_LEFT":
+                    selected_action_i -= 1
+                    if selected_action_i < 0:
+                        selected_action_i = len(legal_actions) - 1
+                elif key.name == "KEY_RIGHT":
+                    selected_action_i = (selected_action_i + 1) % len(legal_actions)
+                elif key.name == "KEY_ENTER":
+                    action = legal_actions[selected_action_i]
+                    if action == "quit":
+                        user_results.add_result(strategy_path, "current", state, og_name_to_name)
+                        log.info(term.pink("quit"))
+                        break
+                    elif action == "new game":
+                        user_results.add_result(strategy_path, "current", state, og_name_to_name)
+                        log.clear()
+                        log.info(term.green("new game"))
+                        state: ShortDeckPokerState = new_game(
+                            n_players=n_players,
+                            include_ranks=list(range(low_card_rank, high_card_rank + 1)),
+                            lut_path=lut_path,
+                            pickle_dir=pickle_dir
+                        )
+                        n_table_rotations -= 1
+                        if n_table_rotations < 0:
+                            n_table_rotations = n_players - 1
+                    else:
+                        log.info(term.green(f"{current_player_name} chose {action}"))
+                        state: ShortDeckPokerState = state.apply_action(action)
+            else:
+                if agent == "random":
+                    action = random.choice(state.legal_actions)
+                    time.sleep(0.8)
+                elif agent == "offline":
+                    default_strategy = {
+                        action: 1 / len(state.legal_actions)
+                        for action in state.legal_actions
+                    }
+                    this_state_strategy = current_strategy.get(
+                        state.info_set, default_strategy
+                    )
+                    # Normalizing strategy.
+                    total = sum(this_state_strategy.values())
+                    this_state_strategy = {
+                        k: v / total for k, v in this_state_strategy.items()
+                    }
+                    actions = list(this_state_strategy.keys())
+                    probabilties = list(this_state_strategy.values())
+                    action = np.random.choice(actions, p=probabilties)
+                    time.sleep(0.8)
+                log.info(f"{current_player_name} chose {action}")
+                state: ShortDeckPokerState = state.apply_action(action)
+
+    log.info("Finished comparing strategies.")
+
 if __name__ == "__main__":
-    run_terminal_app()
+    select_runner()
