@@ -245,6 +245,7 @@ def run_progress_checker(
 ):
     term = Terminal()
     log = AsciiLogger(term)
+    log.height = term.height
     log.info("Running progress checker...")
 
     # Load the current strategy
