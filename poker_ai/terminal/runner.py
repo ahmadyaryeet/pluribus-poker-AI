@@ -218,11 +218,20 @@ def run_terminal_app(
 
 
 def select_runner():
-    user_input = input("Type '1' if you want to play against the AI, Type '2' if you want the Ai to play against a previous version of itself: ")
+    user_input = input("Type '1' if you want to play against the AI, Type '2' if you want the AI to play against a previous version of itself: ")
     if user_input == '1':
         run_terminal_app()
     elif user_input == '2':
-        run_progress_checker()
+        run_progress_checker(
+            low_card_rank=4,
+            high_card_rank=11,
+            lut_path=".",
+            pickle_dir=False,
+            agent="offline",
+            strategy_path="./_2024_07_10_19_16_31_142882/agent.joblib",
+            previous_strategy_path="./_2024_07_10_19_16_31_142882/agent.joblib",
+            debug_quick_start=False
+        )
     
 def run_progress_checker(
     low_card_rank: int,
