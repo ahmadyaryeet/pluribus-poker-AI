@@ -257,133 +257,97 @@ def run_progress_checker(
     previous_strategy = previous_strategy_dict['strategy']
 
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
-    names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "Current AI"}
+    names = {"top-left": "Previous AI", "top-middle": "Previous AI", "top-right": "Previous AI", 
+             "bottom-left": "Previous AI", "bottom-middle": "Previous AI", "bottom-right": "Current AI"}
 
     n_players = 6
-    state: ShortDeckPokerState = new_game(
-        n_players=n_players,
-        include_ranks=list(range(low_card_rank, high_card_rank + 1)),
-        lut_path=lut_path,
-        pickle_dir=pickle_dir
-    )
-
-    n_table_rotations: int = 0
-    selected_action_i: int = 0
     user_results: UserResults = UserResults()
+    games_played = 0
+    max_games = 5
 
-    with term.cbreak(), term.hidden_cursor():
-        while True:
-            ascii_players: Dict[str, AsciiPlayer] = {}
-            state_players = rotate_list(state.players[::-1], n_table_rotations)
-            og_name_to_position = {}
-            og_name_to_name = {}
-            for player_i, player in enumerate(state_players):
-                position = positions[player_i]
-                is_current_ai = names[position].lower() == "current ai"
-                ascii_players[position] = AsciiPlayer(
-                    *player.cards,
-                    term=term,
-                    name=names[position],
-                    og_name=player.name,
-                    hide_cards=not is_current_ai and not state.is_terminal,
-                    folded=not player.is_active,
-                    is_turn=player.is_turn,
-                    chips_in_pot=player.n_bet_chips,
-                    chips_in_bank=player.n_chips,
-                    is_small_blind=player.is_small_blind,
-                    is_big_blind=player.is_big_blind,
-                    is_dealer=player.is_dealer,
-                )
-                og_name_to_position[player.name] = position
-                og_name_to_name[player.name] = names[position]
-                if player.is_turn:
-                    current_player_name = names[position]
+    # Statistics tracking
+    total_hands = 0
+    current_ai_wins = 0
+    current_ai_money = 0
+    previous_ai_wins = 0
+    previous_ai_money = 0
 
-            public_cards = AsciiCardCollection(*state.community_cards)
-            if state.is_terminal:
-                legal_actions = ["quit", "new game"]
-                human_should_interact = True
+    while True:
+        state: ShortDeckPokerState = new_game(
+            n_players=n_players,
+            include_ranks=list(range(low_card_rank, high_card_rank + 1)),
+            lut_path=lut_path,
+            pickle_dir=pickle_dir
+        )
+
+        hands_this_game = 0
+        while not state.is_terminal:
+            hands_this_game += 1
+            og_current_name = state.current_player.name
+            is_current_ai = names[positions[state.players.index(state.current_player)]] == "Current AI"
+
+            if is_current_ai:
+                strategy = current_strategy
             else:
-                og_current_name = state.current_player.name
-                human_should_interact = names[og_name_to_position[og_current_name]].lower() == "current ai"
-                if human_should_interact:
-                    legal_actions = state.legal_actions
-                else:
-                    legal_actions = []
+                strategy = previous_strategy
 
-            # Render game
+            default_strategy = {action: 1 / len(state.legal_actions) for action in state.legal_actions}
+            this_state_strategy = strategy.get(state.info_set, default_strategy)
+            
+            total = sum(this_state_strategy.values())
+            this_state_strategy = {k: v / total for k, v in this_state_strategy.items()}
+            
+            actions = list(this_state_strategy.keys())
+            probabilities = list(this_state_strategy.values())
+            action = np.random.choice(actions, p=probabilities)
+            
+            log.info(f"{names[positions[state.players.index(state.current_player)]]} chose {action}")
+            state = state.apply_action(action)
+
+        # Game ended
+        total_hands += hands_this_game
+        user_results.add_result(strategy_path, "current" if is_current_ai else "previous", state, names)
+        
+        # Update statistics
+        for player in state.players:
+            if names[positions[state.players.index(player)]] == "Current AI":
+                if player.n_chips > 0:
+                    current_ai_wins += 1
+                current_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
+            else:
+                if player.n_chips > 0:
+                    previous_ai_wins += 1
+                previous_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
+
+        games_played += 1
+
+        if games_played >= max_games:
             print(term.home + term.white + term.clear)
-            print_header(term, state, og_name_to_name)
-            print_table(
-                term,
-                ascii_players,
-                public_cards,
-                n_table_rotations,
-                n_chips_in_pot=state._table.pot.total,
-            )
-            print_footer(term, selected_action_i, legal_actions)
             print_log(term, log)
-
-            # Make action of some kind
-            if human_should_interact:
-                selected_action_i %= len(legal_actions)
-                key = term.inkey(timeout=None)
-                if key.name == "q":
-                    log.info(term.pink("quit"))
-                    break
-                elif key.name == "KEY_LEFT":
-                    selected_action_i -= 1
-                    if selected_action_i < 0:
-                        selected_action_i = len(legal_actions) - 1
-                elif key.name == "KEY_RIGHT":
-                    selected_action_i = (selected_action_i + 1) % len(legal_actions)
-                elif key.name == "KEY_ENTER":
-                    action = legal_actions[selected_action_i]
-                    if action == "quit":
-                        user_results.add_result(strategy_path, "current", state, og_name_to_name)
-                        log.info(term.pink("quit"))
-                        break
-                    elif action == "new game":
-                        user_results.add_result(strategy_path, "current", state, og_name_to_name)
-                        log.clear()
-                        log.info(term.green("new game"))
-                        state: ShortDeckPokerState = new_game(
-                            n_players=n_players,
-                            include_ranks=list(range(low_card_rank, high_card_rank + 1)),
-                            lut_path=lut_path,
-                            pickle_dir=pickle_dir
-                        )
-                        n_table_rotations -= 1
-                        if n_table_rotations < 0:
-                            n_table_rotations = n_players - 1
-                    else:
-                        log.info(term.green(f"{current_player_name} chose {action}"))
-                        state: ShortDeckPokerState = state.apply_action(action)
-            else:
-                if agent == "random":
-                    action = random.choice(state.legal_actions)
-                    time.sleep(0.8)
-                elif agent == "offline":
-                    default_strategy = {
-                        action: 1 / len(state.legal_actions)
-                        for action in state.legal_actions
-                    }
-                    this_state_strategy = current_strategy.get(
-                        state.info_set, default_strategy
-                    )
-                    # Normalizing strategy.
-                    total = sum(this_state_strategy.values())
-                    this_state_strategy = {
-                        k: v / total for k, v in this_state_strategy.items()
-                    }
-                    actions = list(this_state_strategy.keys())
-                    probabilties = list(this_state_strategy.values())
-                    action = np.random.choice(actions, p=probabilties)
-                    time.sleep(0.8)
-                log.info(f"{current_player_name} chose {action}")
-                state: ShortDeckPokerState = state.apply_action(action)
+            
+            print("\nStatistics after 5 games:")
+            print(f"Total hands played: {total_hands}")
+            print(f"Current AI wins: {current_ai_wins}")
+            print(f"Previous AI wins: {previous_ai_wins}")
+            print(f"Current AI total money won/lost: ${current_ai_money}")
+            print(f"Previous AI total money won/lost: ${previous_ai_money}")
+            print(f"Current AI average money per game: ${current_ai_money / max_games:.2f}")
+            print(f"Previous AI average money per game: ${previous_ai_money / (max_games * 5):.2f}")
+            
+            user_input = input("5 games completed. Enter 'q' to quit or any other key to continue: ")
+            if user_input.lower() == 'q':
+                break
+            games_played = 0
+            # Reset statistics for the next 5 games
+            total_hands = 0
+            current_ai_wins = 0
+            current_ai_money = 0
+            previous_ai_wins = 0
+            previous_ai_money = 0
 
     log.info("Finished comparing strategies.")
+    print("Final Results:")
+    print(user_results.get_summary())
 
 if __name__ == "__main__":
     select_runner()
