@@ -306,7 +306,7 @@ def run_progress_checker(
 
         # Game ended
         total_hands += hands_this_game
-        user_results.add_result(strategy_path, "current" if is_current_ai else "previous", state, names)
+        #user_results.add_result(strategy_path, "current" if is_current_ai else "previous", state, names)
         
         # Update statistics
         for player in state.players:
