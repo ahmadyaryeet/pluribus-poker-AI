@@ -248,11 +248,9 @@ def run_progress_checker(
     log.height = term.height
     log.info("Running progress checker...")
 
-    # Load the current strategy
+    # Load the strategies only once at the beginning
     current_strategy_dict = joblib.load(strategy_path)
     current_strategy = current_strategy_dict['strategy']
-
-    # Load the previous strategy
     previous_strategy_dict = joblib.load(previous_strategy_path)
     previous_strategy = previous_strategy_dict['strategy']
 
@@ -262,88 +260,76 @@ def run_progress_checker(
 
     n_players = 6
     user_results: UserResults = UserResults()
-    games_played = 0
-    max_games = 5
-
-    # Statistics tracking
-    total_hands = 0
-    current_ai_wins = 0
-    current_ai_money = 0
-    previous_ai_wins = 0
-    previous_ai_money = 0
 
     while True:
-        state: ShortDeckPokerState = new_game(
-            n_players=n_players,
-            include_ranks=list(range(low_card_rank, high_card_rank + 1)),
-            lut_path=lut_path,
-            pickle_dir=pickle_dir
-        )
+        games_played = 0
+        max_games = 5
+        total_hands = 0
+        current_ai_wins = 0
+        current_ai_money = 0
+        previous_ai_wins = 0
+        previous_ai_money = 0
 
-        hands_this_game = 0
-        while not state.is_terminal:
-            hands_this_game += 1
-            og_current_name = state.current_player.name
-            is_current_ai = names[positions[state.players.index(state.current_player)]] == "Current AI"
+        while games_played < max_games:
+            state: ShortDeckPokerState = new_game(
+                n_players=n_players,
+                include_ranks=list(range(low_card_rank, high_card_rank + 1)),
+                lut_path=lut_path,
+                pickle_dir=pickle_dir
+            )
 
-            if is_current_ai:
-                strategy = current_strategy
-            else:
-                strategy = previous_strategy
+            hands_this_game = 0
+            while not state.is_terminal:
+                hands_this_game += 1
+                og_current_name = state.current_player.name
+                is_current_ai = names[positions[state.players.index(state.current_player)]] == "Current AI"
 
-            default_strategy = {action: 1 / len(state.legal_actions) for action in state.legal_actions}
-            this_state_strategy = strategy.get(state.info_set, default_strategy)
+                strategy = current_strategy if is_current_ai else previous_strategy
+
+                default_strategy = {action: 1 / len(state.legal_actions) for action in state.legal_actions}
+                this_state_strategy = strategy.get(state.info_set, default_strategy)
+                
+                total = sum(this_state_strategy.values())
+                this_state_strategy = {k: v / total for k, v in this_state_strategy.items()}
+                
+                actions = list(this_state_strategy.keys())
+                probabilities = list(this_state_strategy.values())
+                action = np.random.choice(actions, p=probabilities)
+                
+                log.info(f"{names[positions[state.players.index(state.current_player)]]} chose {action}")
+                state = state.apply_action(action)
+
+            # Game ended
+            total_hands += hands_this_game
             
-            total = sum(this_state_strategy.values())
-            this_state_strategy = {k: v / total for k, v in this_state_strategy.items()}
-            
-            actions = list(this_state_strategy.keys())
-            probabilities = list(this_state_strategy.values())
-            action = np.random.choice(actions, p=probabilities)
-            
-            log.info(f"{names[positions[state.players.index(state.current_player)]]} chose {action}")
-            state = state.apply_action(action)
+            # Update statistics
+            for player in state.players:
+                if names[positions[state.players.index(player)]] == "Current AI":
+                    if player.n_chips > 0:
+                        current_ai_wins += 1
+                    current_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
+                else:
+                    if player.n_chips > 0:
+                        previous_ai_wins += 1
+                    previous_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
 
-        # Game ended
-        total_hands += hands_this_game
-        #user_results.add_result(strategy_path, "current" if is_current_ai else "previous", state, names)
+            games_played += 1
+
+        print(term.home + term.white + term.clear)
+        print_log(term, log)
         
-        # Update statistics
-        for player in state.players:
-            if names[positions[state.players.index(player)]] == "Current AI":
-                if player.n_chips > 0:
-                    current_ai_wins += 1
-                current_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
-            else:
-                if player.n_chips > 0:
-                    previous_ai_wins += 1
-                previous_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
-
-        games_played += 1
-
-        if games_played >= max_games:
-            print(term.home + term.white + term.clear)
-            print_log(term, log)
-            
-            print("\nStatistics after 5 games:")
-            print(f"Total hands played: {total_hands}")
-            print(f"Current AI wins: {current_ai_wins}")
-            print(f"Previous AI wins: {previous_ai_wins}")
-            print(f"Current AI total money won/lost: ${current_ai_money}")
-            print(f"Previous AI total money won/lost: ${previous_ai_money}")
-            print(f"Current AI average money per game: ${current_ai_money / max_games:.2f}")
-            print(f"Previous AI average money per game: ${previous_ai_money / (max_games * 5):.2f}")
-            
-            user_input = input("5 games completed. Enter 'q' to quit or any other key to continue: ")
-            if user_input.lower() == 'q':
-                break
-            games_played = 0
-            # Reset statistics for the next 5 games
-            total_hands = 0
-            current_ai_wins = 0
-            current_ai_money = 0
-            previous_ai_wins = 0
-            previous_ai_money = 0
+        print("\nStatistics after 5 games:")
+        print(f"Total hands played: {total_hands}")
+        print(f"Current AI wins: {current_ai_wins}")
+        print(f"Previous AI wins: {previous_ai_wins}")
+        print(f"Current AI total money won/lost: ${current_ai_money}")
+        print(f"Previous AI total money won/lost: ${previous_ai_money}")
+        print(f"Current AI average money per game: ${current_ai_money / max_games:.2f}")
+        print(f"Previous AI average money per game: ${previous_ai_money / (max_games * 5):.2f}")
+        
+        user_input = input("5 games completed. Enter 'q' to quit or any other key to continue: ")
+        if user_input.lower() == 'q':
+            break
 
     log.info("Finished comparing strategies.")
     print("Final Results:")
