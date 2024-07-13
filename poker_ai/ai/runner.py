@@ -122,7 +122,7 @@ def resume(server_config_path: str):
 @click.option(
     "--low_card_rank",
     #default=2,
-    default=4,
+    default=2,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
