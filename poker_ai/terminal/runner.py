@@ -263,7 +263,7 @@ def run_progress_checker(
 
     while True:
         games_played = 0
-        max_games = 5
+        max_games = 50
         total_hands = 0
         current_ai_wins = 0
         current_ai_money = 0
@@ -327,7 +327,7 @@ def run_progress_checker(
         print(f"Current AI average money per game: ${current_ai_money / max_games:.2f}")
         print(f"Previous AI average money per game: ${previous_ai_money / (max_games * 5):.2f}")
         
-        user_input = input("5 games completed. Enter 'q' to quit or any other key to continue: ")
+        user_input = input("50 games completed. Enter 'q' to quit or any other key to continue: ")
         if user_input.lower() == 'q':
             break
 
