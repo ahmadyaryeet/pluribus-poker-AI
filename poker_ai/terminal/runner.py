@@ -254,6 +254,14 @@ def run_progress_checker(
     previous_strategy_dict = joblib.load(previous_strategy_path)
     previous_strategy = previous_strategy_dict['strategy']
 
+    # Load the card_info_lut once
+    card_info_lut = ShortDeckPokerState.load_card_lut(
+        lut_path=lut_path,
+        pickle_dir=pickle_dir,
+        low_card_rank=low_card_rank,
+        high_card_rank=high_card_rank
+    )
+
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {"top-left": "Previous AI", "top-middle": "Previous AI", "top-right": "Previous AI", 
              "bottom-left": "Previous AI", "bottom-middle": "Previous AI", "bottom-right": "Current AI"}
@@ -274,8 +282,8 @@ def run_progress_checker(
             state: ShortDeckPokerState = new_game(
                 n_players=n_players,
                 include_ranks=list(range(low_card_rank, high_card_rank + 1)),
-                lut_path=lut_path,
-                pickle_dir=pickle_dir
+                card_info_lut=card_info_lut,  # Pass the pre-loaded card_info_lut
+                load_card_lut=False  # Set this to False to avoid reloading
             )
 
             hands_this_game = 0

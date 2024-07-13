@@ -26,7 +26,9 @@ raise_levels = [2, 5, 50]
 
 
 def new_game(
-    n_players: int, card_info_lut: InfoSetLookupTable = {}, **kwargs
+    n_players: int,
+    card_info_lut: InfoSetLookupTable = None,
+    **kwargs
 ) -> ShortDeckPokerState:
     """
     Create a new game of short deck poker.
@@ -59,8 +61,9 @@ def new_game(
     else:
         # Load massive files.
         state = ShortDeckPokerState(
-            players=players,
-            **kwargs
+        players=players,
+        card_info_lut=card_info_lut,
+        **kwargs
         )
     return state
 
