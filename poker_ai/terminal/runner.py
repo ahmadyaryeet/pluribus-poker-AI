@@ -223,7 +223,7 @@ def select_runner():
         run_terminal_app()
     elif user_input == '2':
         run_progress_checker(
-            low_card_rank=4,
+            low_card_rank=2,
             high_card_rank=11,
             lut_path=".",
             pickle_dir=False,
