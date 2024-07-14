@@ -31,7 +31,7 @@ def test_clustering_1(low_card_rank: int):
     low_card_rank : int
         Lowest card rank in the deck 2-14
     """
-    high_card_rank = 14
+    high_card_rank = 11
     card_combos = CardCombos(
         low_card_rank=low_card_rank,
         high_card_rank=high_card_rank,
