@@ -305,7 +305,7 @@ class ShortDeckPokerState:
         pickle_dir: bool = False,
         #editing these values from static values to being from 2 to 7, and 14 to 11.
 
-        low_card_rank: int = 4,
+        low_card_rank: int = 2,
         high_card_rank: int = 11,
     ) -> Dict[str, Dict[Tuple[int, ...], str]]:
         """
