@@ -19,7 +19,7 @@ from poker_ai.utils.algos import rotate_list
 @click.command()
 @click.option(
     "--low_card_rank",
-    default=2,
+    default=4,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
         "cluster. We recommend starting small."
@@ -223,7 +223,7 @@ def select_runner():
         run_terminal_app()
     elif user_input == '2':
         run_progress_checker(
-            low_card_rank=2,
+            low_card_rank=4,
             high_card_rank=11,
             lut_path=".",
             pickle_dir=False,
