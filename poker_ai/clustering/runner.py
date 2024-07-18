@@ -44,7 +44,7 @@ from poker_ai.clustering.card_info_lut_builder import CardInfoLutBuilder
 @click.command()
 @click.option(
     "--low_card_rank",
-    default=4,
+    default=3,
     # default=2,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
@@ -53,7 +53,7 @@ from poker_ai.clustering.card_info_lut_builder import CardInfoLutBuilder
 )
 @click.option(
     "--high_card_rank",
-    default=11,
+    default=14,
     # default=14,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
