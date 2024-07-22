@@ -257,7 +257,10 @@ class CardInfoLutBuilder(CardCombos):
                 pickle.dump(river_ehs, f)
 
         self.centroids["river"], self._river_clusters = self.cluster(
-            num_clusters=n_river_clusters, X=river_ehs
+            num_clusters=n_river_clusters, 
+            X=river_ehs, 
+            stage="river", 
+            save_path=self.centroid_path
         )
         end = time.time()
         log.info(
@@ -268,6 +271,7 @@ class CardInfoLutBuilder(CardCombos):
             river_ehs_sm.unlink()
         self.load_river()
         return self.create_card_lookup(self._river_clusters, self.river, river_size)
+
 
     def _compute_turn_clusters(self, n_turn_clusters: int):
         log.info("Starting computation of turn clusters.")
@@ -294,7 +298,10 @@ class CardInfoLutBuilder(CardCombos):
             log.info(f"Dumped {(i+dump_interval)/turn_size:.1%} of turn EHS distributions")
 
         self.centroids["turn"], self._turn_clusters = self.cluster(
-            num_clusters=n_turn_clusters, X=self._turn_ehs_distributions
+            num_clusters=n_turn_clusters, 
+            X=self._turn_ehs_distributions, 
+            stage="turn", 
+            save_path=self.centroid_path
         )
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
@@ -338,7 +345,10 @@ class CardInfoLutBuilder(CardCombos):
             log.info(f"Dumped {(i+dump_interval)/flop_size:.1%} of flop potential aware distributions")
 
         self.centroids["flop"], self._flop_clusters = self.cluster(
-            num_clusters=n_flop_clusters, X=self._flop_potential_aware_distributions
+            num_clusters=n_flop_clusters, 
+            X=self._flop_potential_aware_distributions, 
+            stage="flop", 
+            save_path=self.centroid_path
         )
         end = time.time()
         log.info(f"Finished computation of flop clusters - took {end - start} seconds.")
@@ -576,9 +586,29 @@ class CardInfoLutBuilder(CardCombos):
             tol=1e-04,
             random_state=0,
         )
-        y_km = km.fit_predict(X)
-        # Centers to be used for r - 1 (ie; the previous round)
+        batch_size = max(1, len(X) // 10)  # 10% of the data
+        for i in range(0, len(X), batch_size):
+            batch = X[i:i+batch_size]
+            km.partial_fit(batch)
+            
+            # Dump partial results
+            partial_centroids = km.cluster_centers_
+            partial_labels = km.labels_
+            with open(f"{save_path}.{stage}.centroids.part{i//batch_size}", 'wb') as f:
+                pickle.dump(partial_centroids, f)
+            with open(f"{save_path}.{stage}.labels.part{i//batch_size}", 'wb') as f:
+                pickle.dump(partial_labels, f)
+            log.info(f"Dumped {(i+batch_size)/len(X):.1%} of {stage} centroids and labels")
+
+        # Final prediction
+        y_km = km.predict(X)
         centroids = km.cluster_centers_
+
+        # Combine partial dumps
+        for i in range(0, len(X), batch_size):
+            os.remove(f"{save_path}.{stage}.centroids.part{i//batch_size}")
+            os.remove(f"{save_path}.{stage}.labels.part{i//batch_size}")
+
         return centroids, y_km
 
     @staticmethod
