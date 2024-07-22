@@ -53,7 +53,7 @@ from poker_ai.clustering.card_info_lut_builder import CardInfoLutBuilder
 )
 @click.option(
     "--high_card_rank",
-    default=14,
+    default=6,
     # default=14,
     help=(
         "The starting hand rank from 2 through 14 for the deck we want to "
@@ -62,7 +62,7 @@ from poker_ai.clustering.card_info_lut_builder import CardInfoLutBuilder
 )
 @click.option(
     "--n_river_clusters",
-    default=50,
+    default=3,
     #default=3,
     help=(
         "The number of card information buckets we would like to create for "
@@ -71,7 +71,7 @@ from poker_ai.clustering.card_info_lut_builder import CardInfoLutBuilder
 )
 @click.option(
     "--n_turn_clusters",
-    default=50,
+    default=3,
     #default=3,
     help=(
         "The number of card information buckets we would like to create for "
@@ -80,7 +80,7 @@ from poker_ai.clustering.card_info_lut_builder import CardInfoLutBuilder
 )
 @click.option(
     "--n_flop_clusters",
-    default=50,
+    default=3,
     #default=3,
     help=(
         "The number of card information buckets we would like to create for "
