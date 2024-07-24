@@ -150,14 +150,7 @@ class CardInfoLutBuilder(CardCombos):
         mem_info = process.memory_info()
         log.info(f"Memory usage: RSS={mem_info.rss / (1024 ** 2):.2f} MB, VMS={mem_info.vms / (1024 ** 2):.2f} MB")
     
-    def compute(
-        self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int,
-    ):
-        """Compute all clusters and save to card_info_lut dictionary.
-
-        Will attempt to load previous progress and will save after each cluster
-        is computed.
-        """
+    def compute(self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int):
         log.info("Starting computation of clusters.")
         start = time.time()
         
@@ -175,23 +168,40 @@ class CardInfoLutBuilder(CardCombos):
                 self.log_memory_usage()
             
             if "river" not in self.card_info_lut:
-                self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
+                if os.path.exists(f"{self.save_dir}/river_ehs_complete"):
+                    with open(f"{self.save_dir}/river_ehs_complete", 'rb') as f:
+                        river_ehs = pickle.load(f)
+                    self.centroids["river"], self._river_clusters = self.cluster(
+                        num_clusters=n_river_clusters, 
+                        X=river_ehs, 
+                        stage="river", 
+                        save_path=self.centroid_path
+                    )
+                    self.card_info_lut["river"] = self.create_card_lookup(self._river_clusters, self.river, len(river_ehs))
+                else:
+                    self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
                 log.info("Dumping river card_info_lut and centroids.")
-                log.info(f"Size of card_info_lut['river']: {len(self.card_info_lut['river'])}")
-                log.info(f"Size of centroids['river']: {len(self.centroids['river'])}")
-                for key, value in self.card_info_lut.items():
-                    log.info(f"Dumping key: {key} with size: {len(value)}")
                 self.log_memory_usage()
                 with open(self.card_info_lut_path, 'wb') as f:
                     pickle.dump(self.card_info_lut, f)
-                log.info("Dumped card_info_lut successfully.")
                 with open(self.centroid_path, 'wb') as f:
                     pickle.dump(self.centroids, f)
-                log.info("Dumped centroids successfully.")
+                log.info("Dumped river card_info_lut and centroids successfully.")
             
             if "turn" not in self.card_info_lut:
-                self.load_turn()
-                self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
+                if os.path.exists(f"{self.save_dir}/turn_ehs_complete"):
+                    with open(f"{self.save_dir}/turn_ehs_complete", 'rb') as f:
+                        turn_ehs_distributions = pickle.load(f)
+                    self.centroids["turn"], self._turn_clusters = self.cluster(
+                        num_clusters=n_turn_clusters, 
+                        X=turn_ehs_distributions, 
+                        stage="turn", 
+                        save_path=self.centroid_path
+                    )
+                    self.card_info_lut["turn"] = self.create_card_lookup(self._turn_clusters, self.turn)
+                else:
+                    self.load_turn()
+                    self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
                 log.info("Dumping turn card_info_lut and centroids.")
                 self.log_memory_usage()
                 with open(self.card_info_lut_path, 'wb') as f:
@@ -214,7 +224,7 @@ class CardInfoLutBuilder(CardCombos):
         except Exception as e:
             log.error(f"Error during computation or dumping: {e}")
             raise
-    
+
         end = time.time()
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
@@ -224,37 +234,41 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of river clusters.")
         start = time.time()
         self.load_river()
-        river_ehs_sm = None
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         
-        try:
-            river_ehs = joblib.load(self.ehs_river_path)
-            log.info("loaded river ehs")
-        except FileNotFoundError:
+        # Check if we have partial results
+        partial_results = sorted([f for f in os.listdir(self.save_dir) if f.startswith(f"river_ehs.part")])
+        if partial_results:
+            river_ehs = []
+            for part in partial_results:
+                with open(os.path.join(self.save_dir, part), 'rb') as f:
+                    river_ehs.extend(pickle.load(f))
+            log.info(f"Loaded {len(river_ehs)} partial river EHS results")
+        else:
+            river_ehs = []
+
+        if len(river_ehs) < river_size:
             def batch_tasker(batch, cursor, result):
                 for i, x in enumerate(batch):
                     result[cursor + i] = self.process_river_ehs(x)
             
-            river_ehs, river_ehs_sm = multiprocess_ehs_calc(
-                self.river, batch_tasker, river_size
+            remaining_size = river_size - len(river_ehs)
+            new_river_ehs, _ = multiprocess_ehs_calc(
+                self.river[len(river_ehs):], batch_tasker, remaining_size
             )
             
-            # Incremental dumping
-            dump_interval = max(1, river_size // 10)  # 10% intervals
-            for i in range(0, river_size, dump_interval):
-                with open(f"{self.ehs_river_path}.part{i//dump_interval}", 'wb') as f:
-                    pickle.dump(river_ehs[i:i+dump_interval], f)
-                log.info(f"Dumped {(i+dump_interval)/river_size:.1%} of river EHS")
+            # Incremental saving
+            dump_interval = max(1, remaining_size // 10)  # 10% intervals
+            for i in range(0, remaining_size, dump_interval):
+                with open(f"{self.save_dir}/river_ehs.part{(len(river_ehs)+i)//dump_interval}", 'wb') as f:
+                    pickle.dump(new_river_ehs[i:i+dump_interval], f)
+                log.info(f"Saved {(len(river_ehs)+i+dump_interval)/river_size:.1%} of river EHS")
+            
+            river_ehs.extend(new_river_ehs)
 
-        # Combine partial dumps if they exist
-        if os.path.exists(f"{self.ehs_river_path}.part0"):
-            river_ehs = []
-            for i in range(0, river_size, dump_interval):
-                with open(f"{self.ehs_river_path}.part{i//dump_interval}", 'rb') as f:
-                    river_ehs.extend(pickle.load(f))
-                os.remove(f"{self.ehs_river_path}.part{i//dump_interval}")
-            with open(self.ehs_river_path, 'wb') as f:
-                pickle.dump(river_ehs, f)
+        # Save complete river_ehs
+        with open(f"{self.save_dir}/river_ehs_complete", 'wb') as f:
+            pickle.dump(river_ehs, f)
 
         self.centroids["river"], self._river_clusters = self.cluster(
             num_clusters=n_river_clusters, 
@@ -262,13 +276,10 @@ class CardInfoLutBuilder(CardCombos):
             stage="river", 
             save_path=self.centroid_path
         )
+        
         end = time.time()
-        log.info(
-            f"Finished computation of river clusters - took {end - start} seconds."
-        )
-        if river_ehs_sm is not None:
-            river_ehs_sm.close()
-            river_ehs_sm.unlink()
+        log.info(f"Finished computation of river clusters - took {end - start} seconds.")
+        
         self.load_river()
         return self.create_card_lookup(self._river_clusters, self.river, river_size)
 
@@ -276,93 +287,111 @@ class CardInfoLutBuilder(CardCombos):
     def _compute_turn_clusters(self, n_turn_clusters: int):
         log.info("Starting computation of turn clusters.")
         start = time.time()
-        ehs_sm = None
-
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = self.process_turn_ehs_distributions(x)
-        
+        self.load_turn()
         turn_size = len(self.turn)
-        self._turn_ehs_distributions, ehs_sm = multiprocess_ehs_calc(
-            iter(self.turn),
-            batch_tasker,
-            turn_size,
-            len(self.centroids["river"]),
-        )
+        
+        # Check if we have partial results
+        partial_results = sorted([f for f in os.listdir(self.save_dir) if f.startswith(f"turn_ehs.part")])
+        if partial_results:
+            turn_ehs_distributions = []
+            for part in partial_results:
+                with open(os.path.join(self.save_dir, part), 'rb') as f:
+                    turn_ehs_distributions.extend(pickle.load(f))
+            log.info(f"Loaded {len(turn_ehs_distributions)} partial turn EHS distribution results")
+        else:
+            turn_ehs_distributions = []
 
-        # Incremental dumping
-        dump_interval = max(1, turn_size // 10)  # 10% intervals
-        for i in range(0, turn_size, dump_interval):
-            with open(f"{self.card_info_lut_path}.turn.part{i//dump_interval}", 'wb') as f:
-                pickle.dump(self._turn_ehs_distributions[i:i+dump_interval], f)
-            log.info(f"Dumped {(i+dump_interval)/turn_size:.1%} of turn EHS distributions")
+        if len(turn_ehs_distributions) < turn_size:
+            def batch_tasker(batch, cursor, result):
+                for i, x in enumerate(batch):
+                    result[cursor + i] = self.process_turn_ehs_distributions(x)
+            
+            remaining_size = turn_size - len(turn_ehs_distributions)
+            new_turn_ehs_distributions, _ = multiprocess_ehs_calc(
+                iter(self.turn[len(turn_ehs_distributions):]),
+                batch_tasker,
+                remaining_size,
+                len(self.centroids["river"]),
+            )
+            
+            # Incremental saving
+            dump_interval = max(1, remaining_size // 10)  # 10% intervals
+            for i in range(0, remaining_size, dump_interval):
+                with open(f"{self.save_dir}/turn_ehs.part{(len(turn_ehs_distributions)+i)//dump_interval}", 'wb') as f:
+                    pickle.dump(new_turn_ehs_distributions[i:i+dump_interval], f)
+                log.info(f"Saved {(len(turn_ehs_distributions)+i+dump_interval)/turn_size:.1%} of turn EHS distributions")
+            
+            turn_ehs_distributions.extend(new_turn_ehs_distributions)
+
+        # Save complete turn_ehs_distributions
+        with open(f"{self.save_dir}/turn_ehs_complete", 'wb') as f:
+            pickle.dump(turn_ehs_distributions, f)
 
         self.centroids["turn"], self._turn_clusters = self.cluster(
             num_clusters=n_turn_clusters, 
-            X=self._turn_ehs_distributions, 
+            X=turn_ehs_distributions, 
             stage="turn", 
             save_path=self.centroid_path
         )
+        
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
-
-        ehs_sm.close()
-        ehs_sm.unlink()
-
-        # Combine partial dumps
-        self._turn_ehs_distributions = []
-        for i in range(0, turn_size, dump_interval):
-            with open(f"{self.card_info_lut_path}.turn.part{i//dump_interval}", 'rb') as f:
-                self._turn_ehs_distributions.extend(pickle.load(f))
-            os.remove(f"{self.card_info_lut_path}.turn.part{i//dump_interval}")
-
+        
         return self.create_card_lookup(self._turn_clusters, self.turn)
 
     def _compute_flop_clusters(self, n_flop_clusters: int):
         log.info("Starting computation of flop clusters.")
         start = time.time()
-        ehs_sm = None
-
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = (
-                    self.process_flop_potential_aware_distributions(x)
-                )
-        
+        self.load_flop()
         flop_size = len(self.flop)
-        self._flop_potential_aware_distributions, ehs_sm = multiprocess_ehs_calc(
-            iter(self.flop),
-            batch_tasker,
-            flop_size,
-            len(self.centroids["turn"]),
-        )
+        
+        # Check if we have partial results
+        partial_results = sorted([f for f in os.listdir(self.save_dir) if f.startswith(f"flop_ehs.part")])
+        if partial_results:
+            flop_potential_aware_distributions = []
+            for part in partial_results:
+                with open(os.path.join(self.save_dir, part), 'rb') as f:
+                    flop_potential_aware_distributions.extend(pickle.load(f))
+            log.info(f"Loaded {len(flop_potential_aware_distributions)} partial flop potential aware distribution results")
+        else:
+            flop_potential_aware_distributions = []
 
-        # Incremental dumping
-        dump_interval = max(1, flop_size // 10)  # 10% intervals
-        for i in range(0, flop_size, dump_interval):
-            with open(f"{self.card_info_lut_path}.flop.part{i//dump_interval}", 'wb') as f:
-                pickle.dump(self._flop_potential_aware_distributions[i:i+dump_interval], f)
-            log.info(f"Dumped {(i+dump_interval)/flop_size:.1%} of flop potential aware distributions")
+        if len(flop_potential_aware_distributions) < flop_size:
+            def batch_tasker(batch, cursor, result):
+                for i, x in enumerate(batch):
+                    result[cursor + i] = self.process_flop_potential_aware_distributions(x)
+            
+            remaining_size = flop_size - len(flop_potential_aware_distributions)
+            new_flop_potential_aware_distributions, _ = multiprocess_ehs_calc(
+                iter(self.flop[len(flop_potential_aware_distributions):]),
+                batch_tasker,
+                remaining_size,
+                len(self.centroids["turn"]),
+            )
+            
+            # Incremental saving
+            dump_interval = max(1, remaining_size // 10)  # 10% intervals
+            for i in range(0, remaining_size, dump_interval):
+                with open(f"{self.save_dir}/flop_ehs.part{(len(flop_potential_aware_distributions)+i)//dump_interval}", 'wb') as f:
+                    pickle.dump(new_flop_potential_aware_distributions[i:i+dump_interval], f)
+                log.info(f"Saved {(len(flop_potential_aware_distributions)+i+dump_interval)/flop_size:.1%} of flop potential aware distributions")
+            
+            flop_potential_aware_distributions.extend(new_flop_potential_aware_distributions)
+
+        # Save complete flop_potential_aware_distributions
+        with open(f"{self.save_dir}/flop_ehs_complete", 'wb') as f:
+            pickle.dump(flop_potential_aware_distributions, f)
 
         self.centroids["flop"], self._flop_clusters = self.cluster(
             num_clusters=n_flop_clusters, 
-            X=self._flop_potential_aware_distributions, 
+            X=flop_potential_aware_distributions, 
             stage="flop", 
             save_path=self.centroid_path
         )
+        
         end = time.time()
         log.info(f"Finished computation of flop clusters - took {end - start} seconds.")
-
-        ehs_sm.close()
-        ehs_sm.unlink()
-
-        # Combine partial dumps
-        self._flop_potential_aware_distributions = []
-        for i in range(0, flop_size, dump_interval):
-            with open(f"{self.card_info_lut_path}.flop.part{i//dump_interval}", 'rb') as f:
-                self._flop_potential_aware_distributions.extend(pickle.load(f))
-            os.remove(f"{self.card_info_lut_path}.flop.part{i//dump_interval}")
-
+        
         return self.create_card_lookup(self._flop_clusters, self.flop)
    
     def simulate_get_ehs(self, game: GameUtility,) -> np.ndarray:
@@ -577,7 +606,7 @@ class CardInfoLutBuilder(CardCombos):
         return potential_aware_distribution_flop
 
     @staticmethod
-    def cluster(num_clusters: int, X: np.ndarray):
+    def cluster(num_clusters: int, X: np.ndarray, stage: str, save_path: Path):
         km = KMeans(
             n_clusters=num_clusters,
             init="random",
@@ -591,23 +620,24 @@ class CardInfoLutBuilder(CardCombos):
             batch = X[i:i+batch_size]
             km.partial_fit(batch)
             
-            # Dump partial results
+            # Save partial results
             partial_centroids = km.cluster_centers_
             partial_labels = km.labels_
             with open(f"{save_path}.{stage}.centroids.part{i//batch_size}", 'wb') as f:
                 pickle.dump(partial_centroids, f)
             with open(f"{save_path}.{stage}.labels.part{i//batch_size}", 'wb') as f:
                 pickle.dump(partial_labels, f)
-            log.info(f"Dumped {(i+batch_size)/len(X):.1%} of {stage} centroids and labels")
+            log.info(f"Saved {(i+batch_size)/len(X):.1%} of {stage} centroids and labels")
 
         # Final prediction
         y_km = km.predict(X)
         centroids = km.cluster_centers_
 
-        # Combine partial dumps
-        for i in range(0, len(X), batch_size):
-            os.remove(f"{save_path}.{stage}.centroids.part{i//batch_size}")
-            os.remove(f"{save_path}.{stage}.labels.part{i//batch_size}")
+        # Save final results
+        with open(f"{save_path}.{stage}.centroids", 'wb') as f:
+            pickle.dump(centroids, f)
+        with open(f"{save_path}.{stage}.labels", 'wb') as f:
+            pickle.dump(y_km, f)
 
         return centroids, y_km
 
