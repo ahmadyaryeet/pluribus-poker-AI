@@ -49,7 +49,9 @@ class CardInfoLutBuilder(CardCombos):
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
-        self.save_dir = save_dir  # Add this line
+        self.save_dir = save_dir # Add this line
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
         super().__init__(
             low_card_rank, high_card_rank, save_dir
         )
@@ -156,6 +158,7 @@ class CardInfoLutBuilder(CardCombos):
         start = time.time()
         
         # Ensure the directories exist
+        os.makedirs(self.save_dir, exist_ok=True)
         self.card_info_lut_path.parent.mkdir(parents=True, exist_ok=True)
         self.centroid_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -237,6 +240,8 @@ class CardInfoLutBuilder(CardCombos):
         self.load_river()
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         
+        os.makedirs(self.save_dir, exist_ok=True)
+
         # Check if we have partial results
         partial_results = sorted([f for f in os.listdir(self.save_dir) if f.startswith(f"river_ehs.part")])
         if partial_results:
@@ -290,6 +295,8 @@ class CardInfoLutBuilder(CardCombos):
         start = time.time()
         self.load_turn()
         turn_size = len(self.turn)
+
+        os.makedirs(self.save_dir, exist_ok=True)
         
         # Check if we have partial results
         partial_results = sorted([f for f in os.listdir(self.save_dir) if f.startswith(f"turn_ehs.part")])
@@ -346,6 +353,7 @@ class CardInfoLutBuilder(CardCombos):
         self.load_flop()
         flop_size = len(self.flop)
         
+        os.makedirs(self.save_dir, exist_ok=True)
         # Check if we have partial results
         partial_results = sorted([f for f in os.listdir(self.save_dir) if f.startswith(f"flop_ehs.part")])
         if partial_results:
