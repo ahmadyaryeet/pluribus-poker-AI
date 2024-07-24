@@ -22,36 +22,14 @@ from poker_ai.utils.safethread import multiprocess_ehs_calc
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
-
 class CardInfoLutBuilder(CardCombos):
-    """
-    Stores info buckets for each street when called
-
-    Attributes
-    ----------
-    card_info_lut : Dict[str, Any]
-        Lookup table of card combinations per betting round to a cluster id.
-    centroids : Dict[str, Any]
-        Centroids per betting round for use in clustering previous rounds by
-        earth movers distance.
-    """
-
-    def __init__(
-        self,
-        n_simulations_river: int,
-        n_simulations_turn: int,
-        n_simulations_flop: int,
-        low_card_rank: int,
-        high_card_rank: int,
-        save_dir: str,
-    ):
+    def __init__(self, n_simulations_river: int, n_simulations_turn: int, n_simulations_flop: int,
+                 low_card_rank: int, high_card_rank: int, save_dir: str):
         self._evaluator = Evaluator()
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
-        super().__init__(
-            low_card_rank, high_card_rank, save_dir
-        )
+        super().__init__(low_card_rank, high_card_rank, save_dir)
         card_info_lut_filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
         centroid_filename = f"centroids_{low_card_rank}_to_{high_card_rank}.joblib"
         self.card_info_lut_path: Path = Path(save_dir) / card_info_lut_filename
@@ -94,9 +72,7 @@ class CardInfoLutBuilder(CardCombos):
     
     def load_raw_dir(self, raw_dir: str):
         log.info("Calculating pre-flop abstraction.")
-        self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(
-            builder=self
-        )
+        self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(builder=self)
         
         raw_dir_path = Path(raw_dir)
         deck_size = len(self._cards)
@@ -150,18 +126,10 @@ class CardInfoLutBuilder(CardCombos):
         mem_info = process.memory_info()
         log.info(f"Memory usage: RSS={mem_info.rss / (1024 ** 2):.2f} MB, VMS={mem_info.vms / (1024 ** 2):.2f} MB")
     
-    def compute(
-        self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int,
-    ):
-        """Compute all clusters and save to card_info_lut dictionary.
-
-        Will attempt to load previous progress and will save after each cluster
-        is computed.
-        """
+    def compute(self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int):
         log.info("Starting computation of clusters.")
         start = time.time()
         
-        # Ensure the directories exist
         self.card_info_lut_path.parent.mkdir(parents=True, exist_ok=True)
         self.centroid_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -169,47 +137,32 @@ class CardInfoLutBuilder(CardCombos):
             if "pre_flop" not in self.card_info_lut:
                 self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(builder=self)
                 log.info("Dumping pre_flop card_info_lut.")
-                with open(self.card_info_lut_path, 'wb') as f:
-                    pickle.dump(self.card_info_lut, f)
+                self._dump_intermediate_results()
                 log.info("Dumped pre_flop card_info_lut successfully.")
                 self.log_memory_usage()
             
             if "river" not in self.card_info_lut:
                 self.card_info_lut["river"] = self._compute_river_clusters(n_river_clusters)
                 log.info("Dumping river card_info_lut and centroids.")
-                log.info(f"Size of card_info_lut['river']: {len(self.card_info_lut['river'])}")
-                log.info(f"Size of centroids['river']: {len(self.centroids['river'])}")
-                for key, value in self.card_info_lut.items():
-                    log.info(f"Dumping key: {key} with size: {len(value)}")
+                self._dump_intermediate_results()
+                log.info("Dumped river card_info_lut and centroids successfully.")
                 self.log_memory_usage()
-                with open(self.card_info_lut_path, 'wb') as f:
-                    pickle.dump(self.card_info_lut, f)
-                log.info("Dumped card_info_lut successfully.")
-                with open(self.centroid_path, 'wb') as f:
-                    pickle.dump(self.centroids, f)
-                log.info("Dumped centroids successfully.")
             
             if "turn" not in self.card_info_lut:
                 self.load_turn()
                 self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
                 log.info("Dumping turn card_info_lut and centroids.")
-                self.log_memory_usage()
-                with open(self.card_info_lut_path, 'wb') as f:
-                    pickle.dump(self.card_info_lut, f)
-                with open(self.centroid_path, 'wb') as f:
-                    pickle.dump(self.centroids, f)
+                self._dump_intermediate_results()
                 log.info("Dumped turn card_info_lut and centroids successfully.")
+                self.log_memory_usage()
             
             if "flop" not in self.card_info_lut:
                 self.load_flop()
                 self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
                 log.info("Dumping flop card_info_lut and centroids.")
-                self.log_memory_usage()
-                with open(self.card_info_lut_path, 'wb') as f:
-                    pickle.dump(self.card_info_lut, f)
-                with open(self.centroid_path, 'wb') as f:
-                    pickle.dump(self.centroids, f)
+                self._dump_intermediate_results()
                 log.info("Dumped flop card_info_lut and centroids successfully.")
+                self.log_memory_usage()
         
         except Exception as e:
             log.error(f"Error during computation or dumping: {e}")
@@ -218,10 +171,13 @@ class CardInfoLutBuilder(CardCombos):
         end = time.time()
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
-
+    def _dump_intermediate_results(self):
+        with open(self.card_info_lut_path, 'wb') as f:
+            pickle.dump(self.card_info_lut, f)
+        with open(self.centroid_path, 'wb') as f:
+            pickle.dump(self.centroids, f)
     
     def _compute_river_clusters(self, n_river_clusters: int):
-        """Compute river clusters and create lookup table."""
         log.info("Starting computation of river clusters.")
         start = time.time()
         self.load_river()
@@ -255,7 +211,6 @@ class CardInfoLutBuilder(CardCombos):
         return self.create_card_lookup(self._river_clusters, self.river, river_size)
 
     def _compute_turn_clusters(self, n_turn_clusters: int):
-        """Compute turn clusters and create lookup table."""
         log.info("Starting computation of turn clusters.")
         start = time.time()
         ehs_sm = None
@@ -283,7 +238,6 @@ class CardInfoLutBuilder(CardCombos):
         return self.create_card_lookup(self._turn_clusters, self.turn)
 
     def _compute_flop_clusters(self, n_flop_clusters: int):
-        """Compute flop clusters and create lookup table."""
         log.info("Starting computation of flop clusters.")
         start = time.time()
         ehs_sm = None
@@ -312,50 +266,14 @@ class CardInfoLutBuilder(CardCombos):
 
         return self.create_card_lookup(self._flop_clusters, self.flop)
    
-    def simulate_get_ehs(self, game: GameUtility,) -> np.ndarray:
-        """
-        Get expected hand strength object.
-
-        Parameters
-        ----------
-        game : GameUtility
-            GameState for help with determining winner and sampling opponent hand
-
-        Returns
-        -------
-        ehs : np.ndarray
-            [win_rate, loss_rate, tie_rate]
-        """
+    def simulate_get_ehs(self, game: GameUtility) -> np.ndarray:
         ehs: np.ndarray = np.zeros(3)
         for _ in range(self.n_simulations_river):
             idx: int = game.get_winner()
-            # increment win rate for winner/tie
             ehs[idx] += 1 / self.n_simulations_river
         return ehs
     
-    def simulate_get_turn_ehs_distributions(
-        self,
-        public: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Get histogram of frequencies that a given turn situation resulted in a
-        certain cluster id after a river simulation.
-
-        Parameters
-        ----------
-        available_cards : np.ndarray
-            Array of available cards on the turn
-        public : np.ndarray
-            Cards of our hand (public[:2]) and the board as of the turn (public[2:])
-            concatenated.
-
-        Returns
-        -------
-        turn_ehs_distribution : np.ndarray
-            Array of counts for each cluster the turn fell into by the river
-            after simulations
-        """
-
+    def simulate_get_turn_ehs_distributions(self, public: np.ndarray) -> np.ndarray:
         available_cards = np.array([c for c in self._cards if c not in public])
         hand_size = len(public) + 1
         hand_evaluator = self._evaluator.hand_size_map[hand_size]
@@ -369,7 +287,6 @@ class CardInfoLutBuilder(CardCombos):
         opp_hand[:len(public)] = public
 
         turn_ehs_distribution = np.zeros(len(self.centroids["river"]))
-        # Sample river cards and run simulations.
         for _ in range(self.n_simulations_turn):
             river_card = np.random.choice(available_cards, 1, replace=False)
             non_river_cards = np.array([c for c in available_cards if c != river_card])
@@ -388,8 +305,6 @@ class CardInfoLutBuilder(CardCombos):
                 else:
                     ehs[2] += prob_sub_unit
             
-            # Get EMD for expected hand strength against each river centroid
-            # to which does it belong?
             for idx, river_centroid in enumerate(self.centroids["river"]):
                 emd = wasserstein_distance(ehs, river_centroid)
                 if idx == 0:
@@ -399,27 +314,11 @@ class CardInfoLutBuilder(CardCombos):
                     if emd < min_emd:
                         min_idx = idx
                         min_emd = emd
-            # now increment the cluster to which it belongs -
             turn_ehs_distribution[min_idx] += prob_unit
     
         return turn_ehs_distribution
 
     def process_river_ehs(self, public: np.ndarray) -> np.ndarray:
-        """
-        Get the expected hand strength for a particular card combo.
-
-        Parameters
-        ----------
-        public : np.ndarray
-            Cards to process
-
-        Returns
-        -------
-            Expected hand strength
-        """
-        # our_hand = public[:2]
-        # board = public[2:7]
-
         our_hand_rank = self._evaluator._seven(public)
         available_cards = np.array([c for c in self._cards if c not in public])
         
@@ -438,79 +337,25 @@ class CardInfoLutBuilder(CardCombos):
         return ehs
 
     @staticmethod
-    def get_available_cards(
-        cards: np.ndarray, unavailable_cards: np.ndarray
-    ) -> np.ndarray:
-        """
-        Get all cards that are available.
-
-        Parameters
-        ----------
-        cards : np.ndarray
-        unavailable_cards : np.array
-            Cards that are not available.
-
-        Returns
-        -------
-            Available cards
-        """
-        # Turn into set for O(1) lookup speed.
+    def get_available_cards(cards: np.ndarray, unavailable_cards: np.ndarray) -> np.ndarray:
         unavailable_cards = set(unavailable_cards)
         return np.array([c for c in cards if c not in unavailable_cards])
 
     def process_turn_ehs_distributions(self, public: np.ndarray) -> np.ndarray:
-        """
-        Get the potential aware turn distribution for a particular card combo.
-
-        Parameters
-        ----------
-        public : np.ndarray
-            Cards to process
-
-        Returns
-        -------
-            Potential aware turn distributions
-        """
-        # sample river cards and run a simulation
-        turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(
-            public,
-        )
+        turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(public)
         return turn_ehs_distribution
 
-    def process_flop_potential_aware_distributions(
-        self, public: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Get the potential aware flop distribution for a particular card combo.
-
-        Parameters
-        ----------
-        public : np.ndarray
-            Cards to process
-
-        Returns
-        -------
-            Potential aware flop distributions
-        """
-        available_cards: np.ndarray = self.get_available_cards(
-            cards=self._cards, unavailable_cards=public
-        )
+    def process_flop_potential_aware_distributions(self, public: np.ndarray) -> np.ndarray:
+        available_cards: np.ndarray = self.get_available_cards(cards=self._cards, unavailable_cards=public)
         potential_aware_distribution_flop = np.zeros(len(self.centroids["turn"]))
         extended_public = np.zeros(len(public) + 1)
         extended_public[:-1] = public
         for j in range(self.n_simulations_flop):
-            # randomly generating turn
             turn_card = np.random.choice(available_cards, 1, replace=False)
             extended_public[-1:] = turn_card
-            # getting available cards
-            available_cards_turn = np.array(
-                [x for x in available_cards if x != turn_card[0]]
-            )
-            turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(
-                extended_public,
-            )
+            available_cards_turn = np.array([x for x in available_cards if x != turn_card[0]])
+            turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(extended_public)
             for idx, turn_centroid in enumerate(self.centroids["turn"]):
-                # earth mover distance
                 emd = wasserstein_distance(turn_ehs_distribution, turn_centroid)
                 if idx == 0:
                     min_idx = idx
@@ -519,46 +364,18 @@ class CardInfoLutBuilder(CardCombos):
                     if emd < min_emd:
                         min_idx = idx
                         min_emd = emd
-            # Now increment the cluster to which it belongs.
             potential_aware_distribution_flop[min_idx] += 1 / self.n_simulations_flop
         return potential_aware_distribution_flop
 
     @staticmethod
     def cluster(num_clusters: int, X: np.ndarray):
-        km = KMeans(
-            n_clusters=num_clusters,
-            init="random",
-            n_init=10,
-            max_iter=300,
-            tol=1e-04,
-            random_state=0,
-        )
+        km = KMeans(n_clusters=num_clusters, init="random", n_init=10, max_iter=300, tol=1e-04, random_state=0)
         y_km = km.fit_predict(X)
-        # Centers to be used for r - 1 (ie; the previous round)
         centroids = km.cluster_centers_
         return centroids, y_km
 
     @staticmethod
-    def create_card_lookup(
-        clusters: np.ndarray,
-        card_combos: np.ndarray,
-        card_combos_size: Optional[int] = None,
-    ) -> Dict:
-        """
-        Create lookup table.
-
-        Parameters
-        ----------
-        clusters : np.ndarray
-            Array of cluster ids.
-        card_combos : np.ndarray
-            The card combos to which the cluster ids belong.
-
-        Returns
-        -------
-        lossy_lookup : Dict
-            Lookup table for finding cluster ids.
-        """
+    def create_card_lookup(clusters: np.ndarray, card_combos: np.ndarray, card_combos_size: Optional[int] = None) -> Dict:
         log.info("Creating lookup table.")
         lossy_lookup = {}
         for i, card_combo in enumerate(tqdm(card_combos, ascii=" >=", total=card_combos_size)):
