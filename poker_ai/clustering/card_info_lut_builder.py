@@ -43,22 +43,27 @@ class CardInfoLutBuilder(CardCombos):
         n_simulations_flop: int,
         low_card_rank: int,
         high_card_rank: int,
-        save_dir: str,
+        save_dir: str = None,
     ):
         self._evaluator = Evaluator()
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
-        self.save_dir = save_dir # Add this line
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
+        if save_dir is None:
+            # Create a default save directory based on card ranks
+            self.save_dir = Path(os.getcwd()) / f"poker_ai_clusters_{low_card_rank}_to_{high_card_rank}"
+        else:
+            self.save_dir = Path(save_dir)
+
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+
         super().__init__(
             low_card_rank, high_card_rank, save_dir
         )
         card_info_lut_filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
         centroid_filename = f"centroids_{low_card_rank}_to_{high_card_rank}.joblib"
-        self.card_info_lut_path: Path = Path(save_dir) / card_info_lut_filename
-        self.centroid_path: Path = Path(save_dir) / centroid_filename
+        self.card_info_lut_path: Path = self.save_dir / card_info_lut_filename
+        self.centroid_path: Path = self.save_dir / centroid_filename
 
         try:
             self.card_info_lut: Dict[str, Any] = joblib.load(self.card_info_lut_path)

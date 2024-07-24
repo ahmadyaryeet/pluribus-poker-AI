@@ -140,8 +140,8 @@ def cluster(
     n_simulations_river: int,
     n_simulations_turn: int,
     n_simulations_flop: int,
-    save_dir: str,
     raw_dir: str,
+    save_dir: str = None,
 ):
     """Run clustering."""
     builder = CardInfoLutBuilder(
@@ -150,7 +150,7 @@ def cluster(
         n_simulations_flop,
         low_card_rank,
         high_card_rank,
-        save_dir,
+        save_dir = save_dir,
     )
     if raw_dir != "":
         builder.load_raw_dir(raw_dir)
