@@ -49,6 +49,7 @@ class CardInfoLutBuilder(CardCombos):
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
+        self.save_dir = save_dir  # Add this line
         super().__init__(
             low_card_rank, high_card_rank, save_dir
         )
