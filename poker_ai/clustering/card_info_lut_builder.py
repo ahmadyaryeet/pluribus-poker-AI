@@ -172,10 +172,13 @@ class CardInfoLutBuilder(CardCombos):
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
     def _dump_intermediate_results(self):
+        log.info("Dumping intermediate results.")
         with open(self.card_info_lut_path, 'wb') as f:
             pickle.dump(self.card_info_lut, f)
+        log.info("Dumped card_info_lut successfully.")
         with open(self.centroid_path, 'wb') as f:
             pickle.dump(self.centroids, f)
+        log.info("Dumped centroids successfully.")
     
     def _compute_river_clusters(self, n_river_clusters: int):
         log.info("Starting computation of river clusters.")
@@ -185,7 +188,7 @@ class CardInfoLutBuilder(CardCombos):
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         try:
             river_ehs = joblib.load(self.ehs_river_path)
-            log.info("loaded river ehs")
+            log.info("Loaded river EHS.")
         except FileNotFoundError:
             def batch_tasker(batch, cursor, result):
                 for i, x in enumerate(batch):
@@ -201,12 +204,13 @@ class CardInfoLutBuilder(CardCombos):
             num_clusters=n_river_clusters, X=river_ehs
         )
         end = time.time()
-        log.info(
-            f"Finished computation of river clusters - took {end - start} seconds."
-        )
+        log.info(f"Finished computation of river clusters - took {end - start} seconds.")
+        log.info(f"Number of river clusters: {n_river_clusters}")
+
         if river_ehs_sm is not None:
             river_ehs_sm.close()
             river_ehs_sm.unlink()
+        
         self.load_river()
         return self.create_card_lookup(self._river_clusters, self.river, river_size)
 
@@ -231,6 +235,7 @@ class CardInfoLutBuilder(CardCombos):
         )
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
+        log.info(f"Number of turn clusters: {n_turn_clusters}")
 
         ehs_sm.close()
         ehs_sm.unlink()
@@ -244,9 +249,7 @@ class CardInfoLutBuilder(CardCombos):
 
         def batch_tasker(batch, cursor, result):
             for i, x in enumerate(batch):
-                result[cursor + i] = (
-                    self.process_flop_potential_aware_distributions(x)
-                )
+                result[cursor + i] = self.process_flop_potential_aware_distributions(x)
         
         self._flop_potential_aware_distributions, ehs_sm = multiprocess_ehs_calc(
             iter(self.flop),
@@ -260,6 +263,7 @@ class CardInfoLutBuilder(CardCombos):
         )
         end = time.time()
         log.info(f"Finished computation of flop clusters - took {end - start} seconds.")
+        log.info(f"Number of flop clusters: {n_flop_clusters}")
 
         ehs_sm.close()
         ehs_sm.unlink()
