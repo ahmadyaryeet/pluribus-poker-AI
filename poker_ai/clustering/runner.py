@@ -141,7 +141,7 @@ def cluster(
     n_simulations_turn: int,
     n_simulations_flop: int,
     raw_dir: str,
-    save_dir: str = None,
+    save_dir: str,
 ):
     """Run clustering."""
     builder = CardInfoLutBuilder(

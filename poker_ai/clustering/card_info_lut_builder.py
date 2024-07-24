@@ -65,6 +65,10 @@ class CardInfoLutBuilder(CardCombos):
         self.card_info_lut_path: Path = self.save_dir / card_info_lut_filename
         self.centroid_path: Path = self.save_dir / centroid_filename
 
+        self.ehs_river_path: Path = self.save_dir / f"river_ehs_{low_card_rank}_to_{high_card_rank}.joblib"
+        self.ehs_turn_path: Path = self.save_dir / f"turn_ehs_{low_card_rank}_to_{high_card_rank}.joblib"
+        self.ehs_flop_path: Path = self.save_dir / f"flop_ehs_{low_card_rank}_to_{high_card_rank}.joblib"
+
         try:
             self.card_info_lut: Dict[str, Any] = joblib.load(self.card_info_lut_path)
             self.centroids: Dict[str, Any] = joblib.load(self.centroid_path)
@@ -312,7 +316,7 @@ class CardInfoLutBuilder(CardCombos):
         # Incremental dumping
         dump_interval = max(1, turn_size // 10)  # 10% intervals
         for i in range(0, turn_size, dump_interval):
-            with open(f"{self.card_info_lut_path}.turn.part{i//dump_interval}", 'wb') as f:
+            with open(f"{self.ehs_turn_path}.part{i//dump_interval}", 'wb') as f:
                 pickle.dump(self._turn_ehs_distributions[i:i+dump_interval], f)
             log.info(f"Dumped {(i+dump_interval)/turn_size:.1%} of turn EHS distributions")
 
@@ -359,7 +363,7 @@ class CardInfoLutBuilder(CardCombos):
         # Incremental dumping
         dump_interval = max(1, flop_size // 10)  # 10% intervals
         for i in range(0, flop_size, dump_interval):
-            with open(f"{self.card_info_lut_path}.flop.part{i//dump_interval}", 'wb') as f:
+            with open(f"{self.ehs_flop_path}.part{i//dump_interval}", 'wb') as f:
                 pickle.dump(self._flop_potential_aware_distributions[i:i+dump_interval], f)
             log.info(f"Dumped {(i+dump_interval)/flop_size:.1%} of flop potential aware distributions")
 
