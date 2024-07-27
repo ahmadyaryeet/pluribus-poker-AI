@@ -189,31 +189,60 @@ class CardInfoLutBuilder(CardCombos):
         self.load_river()
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = self.process_river_ehs(x)
+        # Use memory-mapped array for river_ehs
+        ehs_filename = f"{self.save_dir}/river_ehs_temp.dat"
+        river_ehs = np.memmap(ehs_filename, dtype='float32', mode='w+', shape=(river_size, 3))
         
-        river_ehs, river_ehs_sm = multiprocess_ehs_calc(
-            self.river,
-            batch_tasker,
-            river_size,
-            result_width=3
-        )
+        # Process in larger batches
+        batch_size = 100_000  # 100 million combinations per batch
+        for i in range(0, river_size, batch_size):
+            end = min(i + batch_size, river_size)
+            batch = list(itertools.islice(self.river, i, end))
+            
+            for j, combo in enumerate(batch):
+                river_ehs[i+j] = self.process_river_ehs(combo)
+            
+            log.info(f"Processed {end}/{river_size} combinations.")
+            
+            # Force write to disk
+            river_ehs.flush()
         
-        kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=10000)
-        kmeans.fit(river_ehs)
+        # Clustering
+        kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=batch_size, n_init=3)
+        for i in range(0, river_size, batch_size):
+            end = min(i + batch_size, river_size)
+            kmeans.partial_fit(river_ehs[i:end])
+            log.info(f"Fitted KMeans on {end}/{river_size} combinations.")
         
         self.centroids["river"] = kmeans.cluster_centers_
         
-        # Clean up
-        river_ehs_sm.close()
-        river_ehs_sm.unlink()
+        # Predict clusters and create lookup table incrementally
+        self.card_info_lut["river"] = {}
+        river_iterator = iter(self.river)
+        for i in range(0, river_size, batch_size):
+            end = min(i + batch_size, river_size)
+            batch = list(itertools.islice(river_iterator, batch_size))
+            batch_clusters = kmeans.predict(river_ehs[i:end])
+            
+            for combo, cluster in zip(batch, batch_clusters):
+                self.card_info_lut["river"][tuple(combo)] = int(cluster)
+            
+            log.info(f"Clustered {end}/{river_size} combinations.")
+            
+            # Checkpoint: save intermediate results
+            if i % (batch_size * 5) == 0:
+                with open(f"{self.save_dir}/river_lookup_checkpoint_{i}.pkl", 'wb') as f:
+                    pickle.dump(self.card_info_lut["river"], f)
         
         end = time.time()
         log.info(f"Finished computation of river clusters - took {end - start} seconds.")
         
-        # Create lookup table incrementally
-        self.create_card_lookup_incremental(kmeans, self.river, river_size, "river")
+        # Clean up
+        del river_ehs
+        os.unlink(ehs_filename)
+        
+        # Combine checkpoints if necessary
+        # (This step might be skipped if you're confident about the process completing without interruptions)
         
         return self.card_info_lut["river"]
     
