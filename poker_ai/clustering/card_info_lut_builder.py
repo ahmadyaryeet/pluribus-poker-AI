@@ -18,6 +18,17 @@ from poker_ai.utils.safethread import multiprocess_ehs_calc
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
+def batch_tasker_river(batch, cursor, result):
+    for i, x in enumerate(batch):
+        result[cursor + i] = process_river_ehs(x)
+
+def batch_tasker_turn(batch, cursor, result):
+    for i, x in enumerate(batch):
+        result[cursor + i] = process_turn_ehs_distributions(x)
+
+def batch_tasker_flop(batch, cursor, result):
+    for i, x in enumerate(batch):
+        result[cursor + i] = process_flop_potential_aware_distributions(x)
 
 class CardInfoLutBuilder(CardCombos):
     """
@@ -197,13 +208,9 @@ class CardInfoLutBuilder(CardCombos):
                 river_ehs = pickle.load(f)
             log.info("loaded river ehs")
         except FileNotFoundError:
-            def batch_tasker(batch, cursor, result):
-                for i, x in enumerate(batch):
-                    result[cursor + i] = self.process_river_ehs(x)
-            
             river_ehs = multiprocess_ehs_calc(
                 iter(self.river),
-                batch_tasker,
+                batch_tasker_river,
                 river_size
             )
             with open(self.ehs_river_path, 'wb') as f:
@@ -223,14 +230,10 @@ class CardInfoLutBuilder(CardCombos):
         """Compute turn clusters and create lookup table."""
         log.info("Starting computation of turn clusters.")
         start = time.time()
-
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = self.process_turn_ehs_distributions(x)
         
         self._turn_ehs_distributions = multiprocess_ehs_calc(
             iter(self.turn),
-            batch_tasker,
+            batch_tasker_turn,
             len(self.turn),
             len(self.centroids["river"]),
         )
@@ -248,15 +251,9 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of flop clusters.")
         start = time.time()
 
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = (
-                    self.process_flop_potential_aware_distributions(x)
-                )
-        
         self._flop_potential_aware_distributions = multiprocess_ehs_calc(
             iter(self.flop),
-            batch_tasker,
+            batch_tasker_flop,
             len(self.flop),
             len(self.centroids["turn"]),
         )
@@ -408,7 +405,6 @@ class CardInfoLutBuilder(CardCombos):
         -------
             Available cards
         """
-        # Turn into set for O(1) lookup speed.
         unavailable_cards = set(unavailable_cards)
         return np.array([c for c in cards if c not in unavailable_cards])
 
@@ -425,10 +421,7 @@ class CardInfoLutBuilder(CardCombos):
         -------
             Potential aware turn distributions
         """
-        # sample river cards and run a simulation
-        turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(
-            public,
-        )
+        turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(public)
         return turn_ehs_distribution
 
     def process_flop_potential_aware_distributions(
@@ -453,18 +446,13 @@ class CardInfoLutBuilder(CardCombos):
         extended_public = np.zeros(len(public) + 1)
         extended_public[:-1] = public
         for j in range(self.n_simulations_flop):
-            # randomly generating turn
             turn_card = np.random.choice(available_cards, 1, replace=False)
             extended_public[-1:] = turn_card
-            # getting available cards
             available_cards_turn = np.array(
                 [x for x in available_cards if x != turn_card[0]]
             )
-            turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(
-                extended_public,
-            )
+            turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(extended_public)
             for idx, turn_centroid in enumerate(self.centroids["turn"]):
-                # earth mover distance
                 emd = wasserstein_distance(turn_ehs_distribution, turn_centroid)
                 if idx == 0:
                     min_idx = idx
@@ -473,7 +461,6 @@ class CardInfoLutBuilder(CardCombos):
                     if emd < min_emd:
                         min_idx = idx
                         min_emd = emd
-            # Now increment the cluster to which it belongs.
             potential_aware_distribution_flop[min_idx] += 1 / self.n_simulations_flop
         return potential_aware_distribution_flop
 
@@ -489,7 +476,6 @@ class CardInfoLutBuilder(CardCombos):
             random_state=0,
         )
         y_km = km.fit_predict(X)
-        # Centers to be used for r - 1 (ie; the previous round)
         centroids = km.cluster_centers_
         return centroids, y_km
 
@@ -499,23 +485,93 @@ class CardInfoLutBuilder(CardCombos):
         card_combos: np.ndarray,
         card_combos_size: Optional[int] = None,
     ) -> Dict:
-        """
-        Create lookup table.
-
-        Parameters
-        ----------
-        clusters : np.ndarray
-            Array of cluster ids.
-        card_combos : np.ndarray
-            The card combos to which the cluster ids belong.
-
-        Returns
-        -------
-        lossy_lookup : Dict
-            Lookup table for finding cluster ids.
-        """
         log.info("Creating lookup table.")
         lossy_lookup = {}
         for i, card_combo in enumerate(tqdm(card_combos, ascii=" >=", total=card_combos_size)):
             lossy_lookup[tuple(card_combo)] = clusters[i]
         return lossy_lookup
+
+def process_river_ehs(public: np.ndarray) -> np.ndarray:
+    """
+    Get the expected hand strength for a particular card combo.
+
+    Parameters
+    ----------
+    public : np.ndarray
+        Cards to process
+
+    Returns
+    -------
+        Expected hand strength
+    """
+    evaluator = Evaluator()
+    our_hand_rank = evaluator._seven(public)
+    available_cards = np.array([c for c in evaluator._cards if c not in public])
+    
+    prob_unit = 1 / evaluator.n_simulations_river
+    ehs: np.ndarray = np.zeros(3)
+    opp_hand = public.copy()
+    for _ in range(evaluator.n_simulations_river):
+        opp_hand[:2] = np.random.choice(available_cards, 2, replace=False)
+        opp_hand_rank = evaluator._seven(opp_hand)
+        if our_hand_rank > opp_hand_rank:
+            ehs[0] += prob_unit
+        elif our_hand_rank < opp_hand_rank:
+            ehs[1] += prob_unit
+        else:
+            ehs[2] += prob_unit
+    return ehs
+
+def process_turn_ehs_distributions(public: np.ndarray) -> np.ndarray:
+    """
+    Get the potential aware turn distribution for a particular card combo.
+
+    Parameters
+    ----------
+    public : np.ndarray
+        Cards to process
+
+    Returns
+    -------
+        Potential aware turn distributions
+    """
+    builder = CardInfoLutBuilder()
+    turn_ehs_distribution = builder.simulate_get_turn_ehs_distributions(public)
+    return turn_ehs_distribution
+
+def process_flop_potential_aware_distributions(public: np.ndarray) -> np.ndarray:
+    """
+    Get the potential aware flop distribution for a particular card combo.
+
+    Parameters
+    ----------
+    public : np.ndarray
+        Cards to process
+
+    Returns
+    -------
+        Potential aware flop distributions
+    """
+    builder = CardInfoLutBuilder()
+    available_cards: np.ndarray = builder.get_available_cards(builder._cards, public)
+    potential_aware_distribution_flop = np.zeros(len(builder.centroids["turn"]))
+    extended_public = np.zeros(len(public) + 1)
+    extended_public[:-1] = public
+    for j in range(builder.n_simulations_flop):
+        turn_card = np.random.choice(available_cards, 1, replace=False)
+        extended_public[-1:] = turn_card
+        available_cards_turn = np.array(
+            [x for x in available_cards if x != turn_card[0]]
+        )
+        turn_ehs_distribution = builder.simulate_get_turn_ehs_distributions(extended_public)
+        for idx, turn_centroid in enumerate(builder.centroids["turn"]):
+            emd = wasserstein_distance(turn_ehs_distribution, turn_centroid)
+            if idx == 0:
+                min_idx = idx
+                min_emd = emd
+            else:
+                if emd < min_emd:
+                    min_idx = idx
+                    min_emd = emd
+        potential_aware_distribution_flop[min_idx] += 1 / builder.n_simulations_flop
+    return potential_aware_distribution_flop
