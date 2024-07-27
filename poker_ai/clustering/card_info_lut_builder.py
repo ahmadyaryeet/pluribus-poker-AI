@@ -189,41 +189,33 @@ class CardInfoLutBuilder(CardCombos):
         self.load_river()
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         
-        # Use memory-mapped array for river_ehs
-        river_ehs = np.memmap(f"{self.save_dir}/river_ehs_temp.dat", dtype='float32', mode='w+', shape=(river_size, 3))
+        def batch_tasker(batch, cursor, result):
+            for i, x in enumerate(batch):
+                result[cursor + i] = self.process_river_ehs(x)
         
-        # Process in smaller batches
-        batch_size = 10000  # Adjust based on available memory
-        for i in range(0, river_size, batch_size):
-            end = min(i + batch_size, river_size)
-            batch = list(itertools.islice(self.river, i, end))
-            
-            def batch_tasker(x, cursor, result):
-                result[cursor] = self.process_river_ehs(x)
-            
-            multiprocess_ehs_calc(batch, batch_tasker, end - i, result=river_ehs[i:end])
-            
-            # Checkpoint: save intermediate results
-            if i % (batch_size * 10) == 0:
-                log.info(f"Processed {i}/{river_size} combinations. Saving checkpoint...")
-                np.save(f"{self.save_dir}/river_ehs_checkpoint_{i}.npy", river_ehs[:i])
+        river_ehs, river_ehs_sm = multiprocess_ehs_calc(
+            self.river,
+            batch_tasker,
+            river_size,
+            result_width=3
+        )
         
-        # Clustering
-        kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=batch_size)
-        for i in range(0, river_size, batch_size):
-            end = min(i + batch_size, river_size)
-            kmeans.partial_fit(river_ehs[i:end])
+        kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=10000)
+        kmeans.fit(river_ehs)
         
         self.centroids["river"] = kmeans.cluster_centers_
-        self._river_clusters = kmeans.predict(river_ehs)
+        
+        # Clean up
+        river_ehs_sm.close()
+        river_ehs_sm.unlink()
         
         end = time.time()
         log.info(f"Finished computation of river clusters - took {end - start} seconds.")
         
-        # Clean up
-        os.unlink(f"{self.save_dir}/river_ehs_temp.dat")
+        # Create lookup table incrementally
+        self.create_card_lookup_incremental(kmeans, self.river, river_size, "river")
         
-        return self.create_card_lookup(self._river_clusters, self.river, river_size)
+        return self.card_info_lut["river"]
     
 
     def _compute_turn_clusters(self, n_turn_clusters: int):
@@ -398,3 +390,39 @@ class CardInfoLutBuilder(CardCombos):
             lossy_lookup[tuple(card_combo)] = clusters[i]
         log.info("Finished creating lookup table")
         return lossy_lookup
+
+    def create_card_lookup_incremental(self, kmeans, card_combos, total_size, stage):
+        log.info(f"Creating {stage} lookup table incrementally.")
+        batch_size = 1000000  # Adjust based on available memory
+        lookup = {}
+        
+        for i in range(0, total_size, batch_size):
+            end = min(i + batch_size, total_size)
+            batch = list(itertools.islice(card_combos, i, end))
+            
+            batch_ehs = np.array([self.process_river_ehs(combo) for combo in batch])
+            batch_clusters = kmeans.predict(batch_ehs)
+            
+            for combo, cluster in zip(batch, batch_clusters):
+                lookup[tuple(combo)] = int(cluster)
+            
+            if i % (batch_size * 10) == 0:
+                log.info(f"Processed {i}/{total_size} combinations for {stage}.")
+                
+                # Save intermediate results
+                with open(f"{self.save_dir}/{stage}_lookup_checkpoint_{i}.pkl", 'wb') as f:
+                    pickle.dump(lookup, f)
+                
+                # Clear lookup to free memory
+                lookup.clear()
+        
+        # Combine all checkpoints
+        self.card_info_lut[stage] = {}
+        for i in range(0, total_size, batch_size * 10):
+            with open(f"{self.save_dir}/{stage}_lookup_checkpoint_{i}.pkl", 'rb') as f:
+                self.card_info_lut[stage].update(pickle.load(f))
+            
+            # Remove checkpoint file
+            os.remove(f"{self.save_dir}/{stage}_lookup_checkpoint_{i}.pkl")
+        
+        log.info(f"Finished creating {stage} lookup table.")
