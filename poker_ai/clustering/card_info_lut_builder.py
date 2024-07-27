@@ -195,42 +195,45 @@ class CardInfoLutBuilder(CardCombos):
         
         # Process in larger batches
         batch_size = 100_000  # 100,000 combinations per batch
-        for i in range(0, river_size, batch_size):
-            end = min(i + batch_size, river_size)
-            batch = list(itertools.islice(self.river, i, end))
-            
-            with concurrent.futures.ProcessPoolExecutor() as executor:
-                batch_results = list(executor.map(self.process_river_ehs, batch))
-            
-            for j, result in enumerate(batch_results):
-                river_ehs[i+j] = result
-            
-            log.info(f"Processed {end}/{river_size} combinations.")
-            
-            # Force write to disk
-            river_ehs.flush()
         
+        with tqdm(total=river_size, desc="Processing river combinations") as pbar:
+            for i in range(0, river_size, batch_size):
+                end = min(i + batch_size, river_size)
+                batch = list(itertools.islice(self.river, batch_size))
+                
+                if not batch:  # Check if we've exhausted the generator
+                    break
+                
+                with concurrent.futures.ProcessPoolExecutor() as executor:
+                    batch_results = list(executor.map(self.process_river_ehs, batch))
+                
+                for j, result in enumerate(batch_results):
+                    river_ehs[i+j] = result
+                
+                pbar.update(len(batch))
+                
+                # Force write to disk
+                river_ehs.flush()
+        
+        log.info("Starting KMeans clustering")
         # Clustering
         kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=batch_size, n_init=3)
-        for i in range(0, river_size, batch_size):
+        for i in tqdm(range(0, river_size, batch_size), desc="Fitting KMeans"):
             end = min(i + batch_size, river_size)
             kmeans.partial_fit(river_ehs[i:end])
-            log.info(f"Fitted KMeans on {end}/{river_size} combinations.")
         
         self.centroids["river"] = kmeans.cluster_centers_
         
         # Predict clusters and create lookup table incrementally
         self.card_info_lut["river"] = {}
-        river_iterator = iter(self.river)
-        for i in range(0, river_size, batch_size):
+        self.river = self.load_river()  # Reset the generator
+        for i in tqdm(range(0, river_size, batch_size), desc="Creating lookup table"):
             end = min(i + batch_size, river_size)
-            batch = list(itertools.islice(river_iterator, batch_size))
+            batch = list(itertools.islice(self.river, batch_size))
             batch_clusters = kmeans.predict(river_ehs[i:end])
             
             for combo, cluster in zip(batch, batch_clusters):
                 self.card_info_lut["river"][tuple(combo)] = int(cluster)
-            
-            log.info(f"Clustered {end}/{river_size} combinations.")
             
             # Checkpoint: save intermediate results
             if i % (batch_size * 5) == 0:
