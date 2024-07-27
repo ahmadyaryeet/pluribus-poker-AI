@@ -11,6 +11,7 @@ import joblib
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import wasserstein_distance
+from sklearn.cluster import MiniBatchKMeans
 from tqdm import tqdm
 
 from poker_ai.clustering.card_combos import CardCombos
@@ -222,7 +223,7 @@ class CardInfoLutBuilder(CardCombos):
         
         return self.create_card_lookup(self._river_clusters, self.river, river_size)
     
-    
+
     def _compute_turn_clusters(self, n_turn_clusters: int):
         log.info("Starting computation of turn clusters.")
         start = time.time()
