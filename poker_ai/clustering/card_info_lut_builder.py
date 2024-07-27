@@ -24,6 +24,9 @@ from poker_ai.utils.safethread import multiprocess_ehs_calc
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
+def process_batch(self, batch):
+    return [self.process_river_ehs(combo) for combo in batch]
+
 class CardInfoLutBuilder(CardCombos):
     def __init__(self, n_simulations_river: int, n_simulations_turn: int, n_simulations_flop: int,
                  low_card_rank: int, high_card_rank: int, save_dir: str):
@@ -196,9 +199,6 @@ class CardInfoLutBuilder(CardCombos):
         # Process in larger batches
         batch_size = 100_000  # 100,000 combinations per batch
         
-        def process_batch(batch):
-            return [self.process_river_ehs(combo) for combo in batch]
-        
         with tqdm(total=river_size, desc="Processing river combinations") as pbar:
             for i in range(0, river_size, batch_size):
                 end = min(i + batch_size, river_size)
@@ -208,7 +208,7 @@ class CardInfoLutBuilder(CardCombos):
                     break
                 
                 with concurrent.futures.ProcessPoolExecutor() as executor:
-                    batch_results = list(executor.submit(process_batch, batch).result())
+                    batch_results = list(executor.map(self.process_river_ehs, batch))
                 
                 for j, result in enumerate(batch_results):
                     river_ehs[i+j] = result
