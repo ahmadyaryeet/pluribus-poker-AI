@@ -73,7 +73,7 @@ class CardInfoLutBuilder(CardCombos):
             with tqdm(total=line_count, ascii=" >=") as pbar:
                 while True:
                     combos_line = combos_file.readline().strip()
-                    clusters_line = combos_file.readline().strip()
+                    clusters_line = clusters_file.readline().strip()
                     if not combos_line or not clusters_line:
                         break
 
@@ -343,14 +343,6 @@ class CardInfoLutBuilder(CardCombos):
 
         return turn_ehs_distribution
 
-
-    @staticmethod
-    def get_available_cards(
-        cards: np.ndarray, unavailable_cards: np.ndarray
-    ) -> np.ndarray:
-        unavailable_cards = set(unavailable_cards)
-        return np.array([c for c in cards if c not in unavailable_cards])
-
     def process_turn_ehs_distributions(self, public: np.ndarray) -> np.ndarray:
         turn_ehs_distribution = self.simulate_get_turn_ehs_distributions(public)
         return turn_ehs_distribution
@@ -358,9 +350,7 @@ class CardInfoLutBuilder(CardCombos):
     def process_flop_potential_aware_distributions(
         self, public: np.ndarray,
     ) -> np.ndarray:
-        available_cards: np.ndarray = self.get_available_cards(
-            cards=self._evaluator.cards, unavailable_cards=public
-        )
+        available_cards: np.ndarray = self._evaluator.get_available_cards(public)
         potential_aware_distribution_flop = np.zeros(len(self.centroids["turn"]))
         extended_public = np.zeros(len(public) + 1)
         extended_public[:-1] = public

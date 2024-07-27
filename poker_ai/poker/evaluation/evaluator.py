@@ -15,15 +15,21 @@ class Evaluator(object):
     all calculations are done with bit arithmetic and table lookups.
     """
 
-    def __init__(self, deck_size=52):
-        self.deck_size = deck_size
-        self.cards = np.arange(deck_size)  # Assuming standard deck of `deck_size` cards
+    def __init__(self, deck_size: int):
         self.table = LookupTable()
-
         self.hand_size_map = {5: self._five, 6: self._six, 7: self._seven}
+        self.cards = self._generate_deck(deck_size)
 
-    def get_available_cards(self, public):
-        return np.array([c for c in self.cards if c not in public])
+    def _generate_deck(self, deck_size: int):
+        deck = []
+        for rank in range(2, 2 + deck_size // 4):
+            for suit in range(4):
+                deck.append(EvaluationCard(rank, suit))
+        return deck
+
+    def get_available_cards(self, public: np.ndarray) -> np.ndarray:
+        public_set = set(public)
+        return np.array([card for card in self.cards if card not in public_set])
 
     def evaluate(self, cards, board):
         """
