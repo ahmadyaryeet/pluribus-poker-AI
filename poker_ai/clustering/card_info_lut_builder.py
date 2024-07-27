@@ -51,8 +51,10 @@ class CardInfoLutBuilder(CardCombos):
         )
         card_info_lut_filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
         centroid_filename = f"centroids_{low_card_rank}_to_{high_card_rank}.joblib"
+        ehs_river_filename = f"ehs_river_{low_card_rank}_to_{high_card_rank}.joblib"
         self.card_info_lut_path: Path = Path(save_dir) / card_info_lut_filename
         self.centroid_path: Path = Path(save_dir) / centroid_filename
+        self.ehs_river_path: Path = Path(save_dir) / ehs_river_filename
 
         try:
             with open(self.card_info_lut_path, 'rb') as f:

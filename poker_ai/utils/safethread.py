@@ -93,7 +93,7 @@ def multiprocess_ehs_calc(
     result_sm.close()
     result_sm.unlink()
     
-    return result
+    return result, result_sm
 
 def batch_process(
     source_iter: Iterable[Any],
