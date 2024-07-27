@@ -16,15 +16,13 @@ class Evaluator(object):
     """
 
     def __init__(self):
-
         self.table = LookupTable()
-
+        self._cards = [i for i in range(52)]  # Assuming a standard deck of 52 cards
         self.hand_size_map = {5: self._five, 6: self._six, 7: self._seven}
 
     def evaluate(self, cards, board):
         """
         This is the function that the user calls to get a hand rank.
-
         Supports empty board, etc very flexible. No input validation
         because that's cycles!
         """
@@ -35,7 +33,6 @@ class Evaluator(object):
         """
         Performs an evalution given cards in integer form, mapping them to
         a rank in the range [1, 7462], with lower ranks being more powerful.
-
         Variant of Cactus Kev's 5 card evaluator, though I saved a lot of memory
         space using a hash table and condensing some of the calculations.
         """
@@ -44,7 +41,6 @@ class Evaluator(object):
             handOR = (cards[0] | cards[1] | cards[2] | cards[3] | cards[4]) >> 16
             prime = EvaluationCard.prime_product_from_rankbits(handOR)
             return self.table.flush_lookup[prime]
-
         # otherwise
         else:
             prime = EvaluationCard.prime_product_from_hand(cards)
@@ -57,14 +53,11 @@ class Evaluator(object):
         and returns this ranking.
         """
         minimum = LookupTable.MAX_HIGH_CARD
-
         all5cardcombobs = itertools.combinations(cards, 5)
         for combo in all5cardcombobs:
-
             score = self._five(combo)
             if score < minimum:
                 minimum = score
-
         return minimum
 
     def _seven(self, cards):
@@ -74,14 +67,11 @@ class Evaluator(object):
         and returns this ranking.
         """
         minimum = LookupTable.MAX_HIGH_CARD
-
         all5cardcombobs = itertools.combinations(cards, 5)
         for combo in all5cardcombobs:
-
             score = self._five(combo)
             if score < minimum:
                 minimum = score
-
         return minimum
 
     def get_rank_class(self, hr):
@@ -123,11 +113,9 @@ class Evaluator(object):
     def hand_summary(self, board, hands):
         """
         Gives a sumamry of the hand with ranks as time proceeds.
-
         Requires that the board is in chronological order for the
         analysis to make sense.
         """
-
         assert len(board) == 5, "Invalid board length"
         for hand in hands:
             assert len(hand) == 2, "Inavlid hand length"
@@ -142,17 +130,12 @@ class Evaluator(object):
             best_rank = 7463  # rank one worse than worst hand
             winners = []
             for player, hand in enumerate(hands):
-
                 # evaluate current board position
                 rank = self.evaluate(hand, board[: (i + 3)])
                 rank_class = self.get_rank_class(rank)
                 class_string = self.class_to_string(rank_class)
-                percentage = 1.0 - self.get_five_card_rank_percentage(
-                    rank
-                )  # higher better here
-                print(
-                    f"Player {player + 1} hand = {class_string}, percentage rank among all hands = {percentage}"
-                )
+                percentage = 1.0 - self.get_five_card_rank_percentage(rank)  # higher better here
+                print(f"Player {player + 1} hand = {class_string}, percentage rank among all hands = {percentage}")
 
                 # detect winner
                 if rank == best_rank:
@@ -167,20 +150,13 @@ class Evaluator(object):
                 if len(winners) == 1:
                     print(f"Player {winners[0] + 1} hand is currently winning.\n")
                 else:
-                    print(
-                        f"Players {[x + 1 for x in winners]} are tied for the lead.\n"
-                    )
-
+                    print(f"Players {[x + 1 for x in winners]} are tied for the lead.\n")
             # otherwise on all other streets
             else:
-                hand_result = self.class_to_string(
-                    self.get_rank_class(self.evaluate(hands[winners[0]], board))
-                )
+                hand_result = self.class_to_string(self.get_rank_class(self.evaluate(hands[winners[0]], board)))
                 print()
                 print(f"{line} HAND OVER {line}")
                 if len(winners) == 1:
-                    print(
-                        f"Player {winners[0] + 1} is the winner with a {hand_result}\n"
-                    )
+                    print(f"Player {winners[0] + 1} is the winner with a {hand_result}\n")
                 else:
                     print(f"Players {winners} tied for the win with a {hand_result}\n")
