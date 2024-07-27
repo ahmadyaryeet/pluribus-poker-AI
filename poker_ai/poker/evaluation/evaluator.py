@@ -1,6 +1,5 @@
 import itertools
 import numpy as np
-
 from poker_ai.poker.evaluation.eval_card import EvaluationCard
 from poker_ai.poker.evaluation.lookup import LookupTable
 
@@ -16,11 +15,15 @@ class Evaluator(object):
     all calculations are done with bit arithmetic and table lookups.
     """
 
-    def __init__(self):
-
+    def __init__(self, deck_size=52):
+        self.deck_size = deck_size
+        self.cards = np.arange(deck_size)  # Assuming standard deck of `deck_size` cards
         self.table = LookupTable()
+
         self.hand_size_map = {5: self._five, 6: self._six, 7: self._seven}
-        self.cards = np.arange(20)  # Assuming standard deck of 52 cards
+
+    def get_available_cards(self, public):
+        return np.array([c for c in self.cards if c not in public])
 
     def evaluate(self, cards, board):
         """
@@ -106,7 +109,7 @@ class Evaluator(object):
         elif hr <= LookupTable.MAX_HIGH_CARD:
             c = LookupTable.MAX_TO_RANK_CLASS[LookupTable.MAX_HIGH_CARD]
         else:
-            raise Exception("Inavlid hand rank, cannot return rank class")
+            raise Exception("Invalid hand rank, cannot return rank class")
         return c
 
     def class_to_string(self, class_int):
@@ -123,7 +126,7 @@ class Evaluator(object):
 
     def hand_summary(self, board, hands):
         """
-        Gives a sumamry of the hand with ranks as time proceeds.
+        Gives a summary of the hand with ranks as time proceeds.
 
         Requires that the board is in chronological order for the
         analysis to make sense.
@@ -131,7 +134,7 @@ class Evaluator(object):
 
         assert len(board) == 5, "Invalid board length"
         for hand in hands:
-            assert len(hand) == 2, "Inavlid hand length"
+            assert len(hand) == 2, "Invalid hand length"
 
         line_length = 10
         stages = ["FLOP", "TURN", "RIVER"]

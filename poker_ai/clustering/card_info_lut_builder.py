@@ -35,8 +35,6 @@ def process_river_ehs(public: np.ndarray, evaluator: Evaluator, n_simulations_ri
             ehs[2] += prob_unit
     return ehs
 
-
-
 class CardInfoLutBuilder(CardCombos):
     def __init__(
         self,
@@ -47,7 +45,10 @@ class CardInfoLutBuilder(CardCombos):
         high_card_rank: int,
         save_dir: str,
     ):
-        self._evaluator = Evaluator()
+        # Calculate deck size
+        deck_size = ((high_card_rank - low_card_rank) + 1) * 4
+        
+        self._evaluator = Evaluator(deck_size=deck_size)
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
@@ -72,7 +73,7 @@ class CardInfoLutBuilder(CardCombos):
             with tqdm(total=line_count, ascii=" >=") as pbar:
                 while True:
                     combos_line = combos_file.readline().strip()
-                    clusters_line = clusters_file.readline().strip()
+                    clusters_line = combos_file.readline().strip()
                     if not combos_line or not clusters_line:
                         break
 
