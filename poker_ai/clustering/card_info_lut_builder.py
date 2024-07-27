@@ -30,6 +30,7 @@ class CardInfoLutBuilder(CardCombos):
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
+        self.save_dir = Path(save_dir)
         super().__init__(low_card_rank, high_card_rank, save_dir)
         card_info_lut_filename = f"card_info_lut_{low_card_rank}_to_{high_card_rank}.joblib"
         centroid_filename = f"centroids_{low_card_rank}_to_{high_card_rank}.joblib"
@@ -191,7 +192,7 @@ class CardInfoLutBuilder(CardCombos):
         river_ehs = np.memmap(f"{self.save_dir}/river_ehs_temp.dat", dtype='float32', mode='w+', shape=(river_size, 3))
         
         # Process in smaller batches
-        batch_size = 1000000  # Adjust based on available memory
+        batch_size = 10000  # Adjust based on available memory
         for i in range(0, river_size, batch_size):
             end = min(i + batch_size, river_size)
             batch = self.river[i:end]
