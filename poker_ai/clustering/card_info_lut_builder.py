@@ -196,8 +196,11 @@ class CardInfoLutBuilder(CardCombos):
             end = min(i + batch_size, river_size)
             log.info(f"Processing batch {i//batch_size + 1}, items {i} to {end}")
             
+            # Create an iterator for the current batch
+            batch_iterator = itertools.islice(self.river, batch_size)
+            
             batch_ehs, _ = multiprocess_ehs_calc(
-                list(itertools.islice(self.river, batch_size)), 
+                batch_iterator,  # Pass the iterator instead of a list
                 batch_tasker, 
                 end - i
             )
