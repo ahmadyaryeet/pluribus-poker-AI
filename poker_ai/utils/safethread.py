@@ -1,10 +1,10 @@
 from typing import Optional, Iterable, Callable, Any
-import ctypes
 import multiprocessing
-import time
-from multiprocessing.shared_memory import SharedMemory
 import numpy as np
 from tqdm import tqdm
+import logging
+
+log = logging.getLogger("poker_ai.clustering.multiprocess")
 
 def multiprocess_ehs_calc(
     source_iter: Iterable[Any],
@@ -13,21 +13,16 @@ def multiprocess_ehs_calc(
     result_width: int = 3,
 ):
     result_size = result_size or len(source_iter)
-    result_bytes = result_size * result_width * 8
-    result_sm = SharedMemory(name=None, create=True, size=result_bytes)
-    result = np.ndarray((result_size, result_width), dtype=np.double, buffer=result_sm.buf)
+    result = np.zeros((result_size, result_width), dtype=np.double)
 
     def process_all(batch, cursor):
-        sm = SharedMemory(result_sm.name)
-        result = np.ndarray((result_size, result_width), dtype=np.double, buffer=sm.buf)
-        tasker(batch, cursor, result)
-        sm.close()
+        partial_result = np.zeros((len(batch), result_width), dtype=np.double)
+        tasker(batch, 0, partial_result)
+        result[cursor:cursor + len(batch)] = partial_result
 
     worker_count = multiprocessing.cpu_count()
     batch_size = min(10_000, result_size // worker_count)
     cursor = 0
-    max_batch_seconds = None
-    batch_failed = False
     total = result_size
     if total is None:
         try:
@@ -38,62 +33,32 @@ def multiprocess_ehs_calc(
     with tqdm(total=total, ascii=" >=") as pbar:
         while True:
             task_done = False
+            batches = []
+            for _ in range(worker_count):
+                batch = []
+                for _ in range(batch_size):
+                    try:
+                        batch.append(next(source_iter))
+                    except StopIteration:
+                        task_done = True
+                        break
+                if batch:
+                    batches.append(batch)
             
-            if batch_failed:
-                batches = cached_batches
-            else:
-                batches = []
-                for _ in range(worker_count):
-                    batch = []
-                    for _ in range(batch_size):
-                        try:
-                            batch.append(next(source_iter))
-                        except StopIteration:
-                            task_done = True
-                            break
-                    if batch:
-                        batches.append(batch)
-            
-            cached_batches = batches
-            batch_failed = False
-            
-            total_batch_size = 0
-            processes = []
+            if not batches:
+                break
 
-            start = time.time()
-            for batch in batches:
-                process = multiprocessing.Process(target=process_all, args=(batch, cursor))
-                process.start()
-                processes.append(process)
-                total_batch_size += len(batch)
-                cursor += len(batch)
-        
-            for process in processes:
-                process.join(timeout=max_batch_seconds)
-                if process.is_alive():
-                    process.terminate()
-                    process.join()
-                    batch_failed = True
-                    cursor -= total_batch_size
-                    break
-
-            if batch_failed:
-                continue
-
-            end = time.time()
-            if max_batch_seconds is None:
-                duration = end - start
-                max_batch_seconds = int(duration * 3)
-                
-            pbar.update(total_batch_size)
+            with multiprocessing.Pool(worker_count) as pool:
+                pool.starmap(process_all, [(batch, cursor + i * batch_size) for i, batch in enumerate(batches)])
             
+            cursor += batch_size * len(batches)
+            pbar.update(batch_size * len(batches))
+
             if task_done:
                 break
     
-    result_sm.close()
-    result_sm.unlink()
-    
-    return result, result_sm
+    return result
+
 
 def batch_process(
     source_iter: Iterable[Any],

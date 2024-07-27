@@ -8,7 +8,6 @@ import numpy as np
 from sklearn.cluster import MiniBatchKMeans
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
 
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.combo_lookup import ComboLookup
@@ -204,7 +203,9 @@ class CardInfoLutBuilder(CardCombos):
                     result[cursor + i] = self.process_river_ehs(x)
             
             river_ehs, river_ehs_sm = multiprocess_ehs_calc(
-                self.river, batch_tasker, river_size
+                iter(self.river),
+                batch_tasker,
+                river_size
             )
             with open(self.ehs_river_path, 'wb') as f:
                 pickle.dump(river_ehs, f)
