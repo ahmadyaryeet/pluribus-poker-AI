@@ -1,4 +1,5 @@
 import itertools
+import numpy as np
 
 from poker_ai.poker.evaluation.eval_card import EvaluationCard
 from poker_ai.poker.evaluation.lookup import LookupTable
@@ -18,8 +19,8 @@ class Evaluator(object):
     def __init__(self):
 
         self.table = LookupTable()
-
         self.hand_size_map = {5: self._five, 6: self._six, 7: self._seven}
+        self.cards = np.arange(20)  # Assuming standard deck of 52 cards
 
     def evaluate(self, cards, board):
         """

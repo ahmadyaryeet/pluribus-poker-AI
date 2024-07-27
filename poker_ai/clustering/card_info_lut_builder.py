@@ -20,7 +20,7 @@ from poker_ai.utils.safethread import multiprocess_ehs_calc
 log = logging.getLogger("poker_ai.clustering.runner")
 
 def process_river_ehs(public: np.ndarray, evaluator: Evaluator, n_simulations_river: int) -> np.ndarray:
-    available_cards = np.array([c for c in evaluator._cards if c not in public])
+    available_cards = evaluator.get_available_cards(public)
     prob_unit = 1 / n_simulations_river
     ehs: np.ndarray = np.zeros(3)
     opp_hand = public.copy()
@@ -97,7 +97,7 @@ class CardInfoLutBuilder(CardCombos):
         )
 
         raw_dir_path = Path(raw_dir)
-        deck_size = len(self._cards)
+        deck_size = len(self._evaluator.cards)
 
         raw_river_combos_path: Path = raw_dir_path / "river_combos.txt"
         raw_river_clusters_path: Path = raw_dir_path / "river_clusters.txt"
@@ -190,7 +190,7 @@ class CardInfoLutBuilder(CardCombos):
         start = time.time()
         self.load_river()
         river_ehs_sm = None
-        river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
+        river_size = math.comb(len(self._evaluator.cards), 2) * math.comb(len(self._evaluator.cards) - 2, 5)
 
         def batch_tasker(batch, cursor, result):
             for i, public in enumerate(batch):
@@ -303,7 +303,7 @@ class CardInfoLutBuilder(CardCombos):
         self,
         public: np.ndarray,
     ) -> np.ndarray:
-        available_cards = np.array([c for c in self._cards if c not in public])
+        available_cards = self._evaluator.get_available_cards(public)
         hand_size = len(public) + 1
         hand_evaluator = self._evaluator.hand_size_map[hand_size]
 
@@ -358,7 +358,7 @@ class CardInfoLutBuilder(CardCombos):
         self, public: np.ndarray,
     ) -> np.ndarray:
         available_cards: np.ndarray = self.get_available_cards(
-            cards=self._cards, unavailable_cards=public
+            cards=self._evaluator.cards, unavailable_cards=public
         )
         potential_aware_distribution_flop = np.zeros(len(self.centroids["turn"]))
         extended_public = np.zeros(len(public) + 1)
