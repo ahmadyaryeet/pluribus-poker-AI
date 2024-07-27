@@ -4,6 +4,7 @@ import ctypes
 import multiprocessing
 import time
 from multiprocessing.shared_memory import SharedMemory
+import uuid
 
 import numpy as np
 from tqdm import tqdm
@@ -16,15 +17,27 @@ def multiprocess_ehs_calc(
 ):
     result_size = result_size or len(source_iter)
     result_bytes = result_size * result_width * 8
+    
+    # Generate a unique name for the shared memory
+    shm_name = f"result_sm_{uuid.uuid4().hex}"
+    
+    # Try to clean up any existing shared memory with this name
+    try:
+        existing_shm = SharedMemory(name=shm_name)
+        existing_shm.close()
+        existing_shm.unlink()
+    except FileNotFoundError:
+        pass  # No existing shared memory with this name, which is fine
+    
     result_sm = SharedMemory(
-        name="result_sm", create=True, size=result_bytes
+        name=shm_name, create=True, size=result_bytes
     )
     result = np.ndarray(
         (result_size, result_width), dtype=np.double, buffer=result_sm.buf
     )
 
     def process_all(batch, cursor):
-        sm = SharedMemory("result_sm")
+        sm = SharedMemory(shm_name)
         result = np.ndarray(
             (result_size, result_width), dtype=np.double, buffer=sm.buf
         )
@@ -102,6 +115,8 @@ def multiprocess_ehs_calc(
             
             if task_done:
                 break
+    result_sm.close()
+    result_sm.unlink()
     
     return result, result_sm
 
