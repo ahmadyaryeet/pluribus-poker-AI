@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 from scipy.stats import wasserstein_distance
 from sklearn.cluster import MiniBatchKMeans
 from tqdm import tqdm
+import itertools
 
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.combo_lookup import ComboLookup
@@ -195,7 +196,7 @@ class CardInfoLutBuilder(CardCombos):
         batch_size = 10000  # Adjust based on available memory
         for i in range(0, river_size, batch_size):
             end = min(i + batch_size, river_size)
-            batch = self.river[i:end]
+            batch = list(itertools.islice(self.river, i, end))
             
             def batch_tasker(x, cursor, result):
                 result[cursor] = self.process_river_ehs(x)
