@@ -1,37 +1,28 @@
 from typing import Optional, Iterable, Callable
-
 import ctypes
 import multiprocessing
 import time
 from multiprocessing.shared_memory import SharedMemory
-
-
 import numpy as np
 from tqdm import tqdm
 
 def multiprocess_ehs_calc(
-    source_iter: Iterable[any],
-    tasker: Callable[[Iterable[any], int, int], None],
+    source_iter: Iterable[Any],
+    tasker: Callable[[Iterable[Any], int, np.ndarray], None],
     result_size: int = None,
     result_width: int = 3,
 ):
     result_size = result_size or len(source_iter)
     result_bytes = result_size * result_width * 8
-    result_sm = SharedMemory(
-        name="result_sm", create=True, size=result_bytes
-    )
-    result = np.ndarray(
-        (result_size, result_width), dtype=np.double, buffer=result_sm.buf
-    )
+    result_sm = SharedMemory(name=None, create=True, size=result_bytes)
+    result = np.ndarray((result_size, result_width), dtype=np.double, buffer=result_sm.buf)
 
     def process_all(batch, cursor):
-        sm = SharedMemory("result_sm")
-        result = np.ndarray(
-            (result_size, result_width), dtype=np.double, buffer=sm.buf
-        )
+        sm = SharedMemory(result_sm.name)
+        result = np.ndarray((result_size, result_width), dtype=np.double, buffer=sm.buf)
         tasker(batch, cursor, result)
         sm.close()
-    
+
     worker_count = multiprocessing.cpu_count()
     batch_size = min(10_000, result_size // worker_count)
     cursor = 0
@@ -60,7 +51,7 @@ def multiprocess_ehs_calc(
                         except StopIteration:
                             task_done = True
                             break
-                    if len(batch) > 0:
+                    if batch:
                         batches.append(batch)
             
             cached_batches = batches
@@ -71,22 +62,17 @@ def multiprocess_ehs_calc(
 
             start = time.time()
             for batch in batches:
-                process = multiprocessing.Process(
-                    target=process_all, args=(batch, cursor)
-                )
+                process = multiprocessing.Process(target=process_all, args=(batch, cursor))
                 process.start()
                 processes.append(process)
                 total_batch_size += len(batch)
                 cursor += len(batch)
         
             for process in processes:
-                if max_batch_seconds is None:
-                    process.join()
-                    continue
                 process.join(timeout=max_batch_seconds)
-
                 if process.is_alive():
-                    # Failed to handle this batch.
+                    process.terminate()
+                    process.join()
                     batch_failed = True
                     cursor -= total_batch_size
                     break
@@ -104,20 +90,20 @@ def multiprocess_ehs_calc(
             if task_done:
                 break
     
-    return result, result_sm
-
+    result_sm.close()
+    result_sm.unlink()
+    
+    return result
 
 def batch_process(
-    source_iter: Iterable[any],
-    batch_process: Callable[[Iterable[any], int, multiprocessing.Array], None],
+    source_iter: Iterable[Any],
+    batch_process: Callable[[Iterable[Any], int, multiprocessing.Array], None],
     result_type: ctypes._SimpleCData = ctypes.c_float,
     result_size: int = None,
     worker_count: Optional[int] = None,
     max_batch_size: Optional[int] = None,
 ):
-    result_array = multiprocessing.Array(
-        result_type, result_size
-    )
+    result_array = multiprocessing.Array(result_type, result_size)
 
     worker_count = worker_count or multiprocessing.cpu_count()
     batch_size = min(max_batch_size or 10_000, result_size // worker_count)
@@ -147,7 +133,7 @@ def batch_process(
                         except StopIteration:
                             task_done = True
                             break
-                    if len(batch) > 0:
+                    if batch:
                         batches.append(batch)
             
             cached_batches = batches
@@ -167,13 +153,10 @@ def batch_process(
                 cursor += len(batch)
         
             for process in processes:
-                if max_batch_seconds is None:
-                    process.join()
-                    continue
                 process.join(timeout=max_batch_seconds)
-
                 if process.is_alive():
-                    # Failed to handle this batch.
+                    process.terminate()
+                    process.join()
                     batch_failed = True
                     cursor -= total_batch_size
                     break
