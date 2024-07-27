@@ -4,12 +4,11 @@ import math
 from pathlib import Path
 from typing import Any, Dict, Optional
 import pickle
-
 import numpy as np
-from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
-from sklearn.cluster import MiniBatchKMeans
+from multiprocessing import Pool, cpu_count
 
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.combo_lookup import ComboLookup
@@ -492,8 +491,9 @@ class CardInfoLutBuilder(CardCombos):
 
     @staticmethod
     def cluster(num_clusters: int, X: np.ndarray):
-        km = KMeans(
+        km = MiniBatchKMeans(
             n_clusters=num_clusters,
+            batch_size=1000,
             init="random",
             n_init=10,
             max_iter=300,
