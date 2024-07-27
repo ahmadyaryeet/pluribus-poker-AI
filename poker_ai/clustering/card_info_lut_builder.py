@@ -20,20 +20,21 @@ from poker_ai.utils.safethread import multiprocess_ehs_calc
 log = logging.getLogger("poker_ai.clustering.runner")
 
 def process_river_ehs(public: np.ndarray, evaluator: Evaluator, n_simulations_river: int) -> np.ndarray:
-        available_cards = np.array([c for c in evaluator._cards if c not in public])
-        prob_unit = 1 / n_simulations_river
-        ehs: np.ndarray = np.zeros(3)
-        opp_hand = public.copy()
-        for _ in range(n_simulations_river):
-            opp_hand[:2] = np.random.choice(available_cards, 2, replace=False)
-            opp_hand_rank = evaluator._seven(opp_hand)
-            if evaluator._seven(public) > opp_hand_rank:
-                ehs[0] += prob_unit
-            elif evaluator._seven(public) < opp_hand_rank:
-                ehs[1] += prob_unit
-            else:
-                ehs[2] += prob_unit
-        return ehs
+    available_cards = np.array([c for c in evaluator._cards if c not in public])
+    prob_unit = 1 / n_simulations_river
+    ehs: np.ndarray = np.zeros(3)
+    opp_hand = public.copy()
+    for _ in range(n_simulations_river):
+        opp_hand[:2] = np.random.choice(available_cards, 2, replace=False)
+        opp_hand_rank = evaluator._seven(opp_hand)
+        if evaluator._seven(public) > opp_hand_rank:
+            ehs[0] += prob_unit
+        elif evaluator._seven(public) < opp_hand_rank:
+            ehs[1] += prob_unit
+        else:
+            ehs[2] += prob_unit
+    return ehs
+
 
 
 class CardInfoLutBuilder(CardCombos):
@@ -190,13 +191,18 @@ class CardInfoLutBuilder(CardCombos):
         self.load_river()
         river_ehs_sm = None
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
+
+        def batch_tasker(batch, cursor, result):
+            for i, public in enumerate(batch):
+                result[cursor + i] = process_river_ehs(public, self._evaluator, self.n_simulations_river)
+
         try:
             with open(self.ehs_river_path, 'rb') as f:
                 river_ehs = pickle.load(f)
             log.info("loaded river ehs")
         except FileNotFoundError:
             river_ehs = multiprocess_ehs_calc(
-                self.river, lambda public: process_river_ehs(public, self._evaluator, self.n_simulations_river), river_size
+                self.river, batch_tasker, river_size
             )
             with open(self.ehs_river_path, 'wb') as f:
                 pickle.dump(river_ehs, f)
