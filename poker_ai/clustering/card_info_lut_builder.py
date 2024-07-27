@@ -3,15 +3,15 @@ import time
 import math
 from pathlib import Path
 from typing import Any, Dict, Optional
+import concurrent.futures
+import os
 
 import pickle
-import os
 import psutil
 import joblib
 import numpy as np
-from sklearn.cluster import KMeans
-from scipy.stats import wasserstein_distance
 from sklearn.cluster import MiniBatchKMeans
+from scipy.stats import wasserstein_distance
 from tqdm import tqdm
 import itertools
 
@@ -194,13 +194,16 @@ class CardInfoLutBuilder(CardCombos):
         river_ehs = np.memmap(ehs_filename, dtype='float32', mode='w+', shape=(river_size, 3))
         
         # Process in larger batches
-        batch_size = 100_000  # 100 million combinations per batch
+        batch_size = 100_000  # 100,000 combinations per batch
         for i in range(0, river_size, batch_size):
             end = min(i + batch_size, river_size)
             batch = list(itertools.islice(self.river, i, end))
             
-            for j, combo in enumerate(batch):
-                river_ehs[i+j] = self.process_river_ehs(combo)
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                batch_results = list(executor.map(self.process_river_ehs, batch))
+            
+            for j, result in enumerate(batch_results):
+                river_ehs[i+j] = result
             
             log.info(f"Processed {end}/{river_size} combinations.")
             
@@ -241,67 +244,59 @@ class CardInfoLutBuilder(CardCombos):
         del river_ehs
         os.unlink(ehs_filename)
         
-        # Combine checkpoints if necessary
-        # (This step might be skipped if you're confident about the process completing without interruptions)
-        
         return self.card_info_lut["river"]
     
-
     def _compute_turn_clusters(self, n_turn_clusters: int):
         log.info("Starting computation of turn clusters.")
         start = time.time()
-        ehs_sm = None
-
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = self.process_turn_ehs_distributions(x)
         
-        self._turn_ehs_distributions, ehs_sm = multiprocess_ehs_calc(
-            iter(self.turn),
-            batch_tasker,
-            len(self.turn),
-            len(self.centroids["river"]),
-        )
-
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            self._turn_ehs_distributions = list(
+                tqdm(
+                    executor.map(
+                        self.process_turn_ehs_distributions,
+                        self.turn,
+                        chunksize=len(self.turn) // (os.cpu_count() or 1),
+                    ),
+                    total=len(self.turn),
+                )
+            )
+        
         self.centroids["turn"], self._turn_clusters = self.cluster(
             num_clusters=n_turn_clusters, X=self._turn_ehs_distributions
         )
+        
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
         log.info(f"Number of turn clusters: {n_turn_clusters}")
 
-        ehs_sm.close()
-        ehs_sm.unlink()
-
-        return self.create_card_lookup(self._turn_clusters, self.turn)
+        return self.create_card_lookup_incremental(self._turn_clusters, self.turn, len(self.turn), "turn")
 
     def _compute_flop_clusters(self, n_flop_clusters: int):
         log.info("Starting computation of flop clusters.")
         start = time.time()
-        ehs_sm = None
-
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = self.process_flop_potential_aware_distributions(x)
         
-        self._flop_potential_aware_distributions, ehs_sm = multiprocess_ehs_calc(
-            iter(self.flop),
-            batch_tasker,
-            len(self.flop),
-            len(self.centroids["turn"]),
-        )
-
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            self._flop_potential_aware_distributions = list(
+                tqdm(
+                    executor.map(
+                        self.process_flop_potential_aware_distributions,
+                        self.flop,
+                        chunksize=len(self.flop) // (os.cpu_count() or 1),
+                    ),
+                    total=len(self.flop),
+                )
+            )
+        
         self.centroids["flop"], self._flop_clusters = self.cluster(
             num_clusters=n_flop_clusters, X=self._flop_potential_aware_distributions
         )
+        
         end = time.time()
         log.info(f"Finished computation of flop clusters - took {end - start} seconds.")
         log.info(f"Number of flop clusters: {n_flop_clusters}")
 
-        ehs_sm.close()
-        ehs_sm.unlink()
-
-        return self.create_card_lookup(self._flop_clusters, self.flop)
+        return self.create_card_lookup_incremental(self._flop_clusters, self.flop, len(self.flop), "flop")
    
     def simulate_get_ehs(self, game: GameUtility) -> np.ndarray:
         ehs: np.ndarray = np.zeros(3)
@@ -406,8 +401,29 @@ class CardInfoLutBuilder(CardCombos):
 
     @staticmethod
     def cluster(num_clusters: int, X: np.ndarray):
-        km = KMeans(n_clusters=num_clusters, init="random", n_init=10, max_iter=300, tol=1e-04, random_state=0)
-        y_km = km.fit_predict(X)
+        # Determine a suitable batch size (adjust based on your available RAM and dataset size)
+        batch_size = min(100000, X.shape[0] // 10)  # 10% of data or 100,000, whichever is smaller
+        
+        km = MiniBatchKMeans(
+            n_clusters=num_clusters,
+            init='k-means++',
+            n_init=3,
+            max_iter=300,
+            batch_size=batch_size,
+            tol=1e-04,
+            random_state=0,
+            n_jobs=-1  # Use all available cores
+        )
+        
+        # Fit in batches if the dataset is very large
+        if X.shape[0] > 1000000:  # Arbitrary threshold, adjust as needed
+            for i in range(0, X.shape[0], batch_size):
+                end = min(i + batch_size, X.shape[0])
+                km.partial_fit(X[i:end])
+            y_km = km.predict(X)
+        else:
+            y_km = km.fit_predict(X)
+        
         centroids = km.cluster_centers_
         return centroids, y_km
 
@@ -422,7 +438,7 @@ class CardInfoLutBuilder(CardCombos):
 
     def create_card_lookup_incremental(self, kmeans, card_combos, total_size, stage):
         log.info(f"Creating {stage} lookup table incrementally.")
-        batch_size = 1000000  # Adjust based on available memory
+        batch_size = 10000  # Adjust based on available memory
         lookup = {}
         
         for i in range(0, total_size, batch_size):
