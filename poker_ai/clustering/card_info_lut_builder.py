@@ -10,7 +10,6 @@ from sklearn.cluster import KMeans
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
 from sklearn.cluster import MiniBatchKMeans
-import itertools
 
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.combo_lookup import ComboLookup
@@ -48,7 +47,6 @@ class CardInfoLutBuilder(CardCombos):
         self.n_simulations_river = n_simulations_river
         self.n_simulations_turn = n_simulations_turn
         self.n_simulations_flop = n_simulations_flop
-        self.save_dir = Path(save_dir)
         super().__init__(
             low_card_rank, high_card_rank, save_dir
         )
@@ -178,64 +176,37 @@ class CardInfoLutBuilder(CardCombos):
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
     def _compute_river_clusters(self, n_river_clusters: int):
+        """Compute river clusters and create lookup table."""
         log.info("Starting computation of river clusters.")
         start = time.time()
         self.load_river()
+        river_ehs_sm = None
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
-        
-        ehs_filename = f"{self.save_dir}/river_ehs_temp.dat"
-        river_ehs = np.memmap(ehs_filename, dtype='float32', mode='w+', shape=(river_size, 3))
-        
-        batch_size = 100_000  # Adjust based on available memory
-        
-        def batch_tasker(batch, cursor, result):
-            for i, x in enumerate(batch):
-                result[cursor + i] = self.process_river_ehs(x)
-        
-        for i in range(0, river_size, batch_size):
-            end = min(i + batch_size, river_size)
-            log.info(f"Processing batch {i//batch_size + 1}, items {i} to {end}")
+        try:
+            river_ehs = joblib.load(self.ehs_river_path)
+            log.info("loaded river ehs")
+        except FileNotFoundError:
+            def batch_tasker(batch, cursor, result):
+                for i, x in enumerate(batch):
+                    result[cursor + i] = self.process_river_ehs(x)
             
-            # Create an iterator for the current batch
-            batch_iterator = itertools.islice(self.river, batch_size)
-            
-            batch_ehs, _ = multiprocess_ehs_calc(
-                batch_iterator,  # Pass the iterator instead of a list
-                batch_tasker, 
-                end - i
+            river_ehs, river_ehs_sm = multiprocess_ehs_calc(
+                self.river, batch_tasker, river_size
             )
-            
-            river_ehs[i:end] = batch_ehs
-            river_ehs.flush()
-            
-            if i % (batch_size * 10) == 0:
-                log.info(f"Checkpoint: Processed {i}/{river_size} combinations")
+            joblib.dump(river_ehs, self.ehs_river_path)
 
-        log.info("Starting KMeans clustering")
-        kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=batch_size, n_init=3)
-        for i in range(0, river_size, batch_size):
-            end = min(i + batch_size, river_size)
-            kmeans.partial_fit(river_ehs[i:end])
-
-        self.centroids["river"] = kmeans.cluster_centers_
-        
-        log.info("Creating lookup table")
-        self.load_river()  # Reset the generator
-        self.card_info_lut["river"] = {}
-        for i, combo in enumerate(tqdm(self.river, total=river_size, ascii=" >=")):
-            self.card_info_lut["river"][tuple(combo)] = int(kmeans.predict([river_ehs[i]])[0])
-            
-            if i % (batch_size * 10) == 0:
-                log.info(f"Checkpoint: Processed {i}/{river_size} combinations for lookup table")
-                joblib.dump(self.card_info_lut["river"], f"{self.save_dir}/river_lookup_checkpoint_{i}.joblib")
-
+        self.centroids["river"], self._river_clusters = self.cluster(
+            num_clusters=n_river_clusters, X=river_ehs
+        )
         end = time.time()
-        log.info(f"Finished computation of river clusters - took {end - start} seconds.")
-        
-        del river_ehs
-        os.unlink(ehs_filename)
-        
-        return self.card_info_lut["river"]
+        log.info(
+            f"Finished computation of river clusters - took {end - start} seconds."
+        )
+        if river_ehs_sm is not None:
+            river_ehs_sm.close()
+            river_ehs_sm.unlink()
+        self.load_river()
+        return self.create_card_lookup(self._river_clusters, self.river, river_size)
 
     def _compute_turn_clusters(self, n_turn_clusters: int):
         """Compute turn clusters and create lookup table."""
