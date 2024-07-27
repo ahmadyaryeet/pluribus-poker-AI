@@ -3,8 +3,8 @@ import time
 import math
 from pathlib import Path
 from typing import Any, Dict, Optional
+import pickle
 
-import joblib
 import numpy as np
 from sklearn.cluster import KMeans
 from scipy.stats import wasserstein_distance
@@ -56,8 +56,10 @@ class CardInfoLutBuilder(CardCombos):
         self.centroid_path: Path = Path(save_dir) / centroid_filename
 
         try:
-            self.card_info_lut: Dict[str, Any] = joblib.load(self.card_info_lut_path)
-            self.centroids: Dict[str, Any] = joblib.load(self.centroid_path)
+            with open(self.card_info_lut_path, 'rb') as f:
+                self.card_info_lut: Dict[str, Any] = pickle.load(f)
+            with open(self.centroid_path, 'rb') as f:
+                self.centroids: Dict[str, Any] = pickle.load(f)
         except FileNotFoundError:
             self.centroids: Dict[str, Any] = {}
             self.card_info_lut: Dict[str, Any] = {}
@@ -138,8 +140,10 @@ class CardInfoLutBuilder(CardCombos):
         )
         self.centroids["flop"] = self.load_raw_centroids(raw_flop_centroids_path)
 
-        joblib.dump(self.card_info_lut, self.card_info_lut_path)
-        joblib.dump(self.centroids, self.centroid_path)
+        with open(self.card_info_lut_path, 'wb') as f:
+            pickle.dump(self.card_info_lut, f)
+        with open(self.centroid_path, 'wb') as f:
+            pickle.dump(self.centroids, f)
 
     def compute(
         self, n_river_clusters: int, n_turn_clusters: int, n_flop_clusters: int,
@@ -155,23 +159,30 @@ class CardInfoLutBuilder(CardCombos):
             self.card_info_lut["pre_flop"] = compute_preflop_lossy_abstraction(
                 builder=self
             )
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
+            with open(self.card_info_lut_path, 'wb') as f:
+                pickle.dump(self.card_info_lut, f)
         if "river" not in self.card_info_lut:
             self.card_info_lut["river"] = self._compute_river_clusters(
                 n_river_clusters,
             )
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-            joblib.dump(self.centroids, self.centroid_path)
+            with open(self.card_info_lut_path, 'wb') as f:
+                pickle.dump(self.card_info_lut, f)
+            with open(self.centroid_path, 'wb') as f:
+                pickle.dump(self.centroids, f)
         if "turn" not in self.card_info_lut:
             self.load_turn()
             self.card_info_lut["turn"] = self._compute_turn_clusters(n_turn_clusters)
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-            joblib.dump(self.centroids, self.centroid_path)
+            with open(self.card_info_lut_path, 'wb') as f:
+                pickle.dump(self.card_info_lut, f)
+            with open(self.centroid_path, 'wb') as f:
+                pickle.dump(self.centroids, f)
         if "flop" not in self.card_info_lut:
             self.load_flop()
             self.card_info_lut["flop"] = self._compute_flop_clusters(n_flop_clusters)
-            joblib.dump(self.card_info_lut, self.card_info_lut_path)
-            joblib.dump(self.centroids, self.centroid_path)
+            with open(self.card_info_lut_path, 'wb') as f:
+                pickle.dump(self.card_info_lut, f)
+            with open(self.centroid_path, 'wb') as f:
+                pickle.dump(self.centroids, f)
         end = time.time()
         log.info(f"Finished computation of clusters - took {end - start} seconds.")
 
@@ -183,7 +194,8 @@ class CardInfoLutBuilder(CardCombos):
         river_ehs_sm = None
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         try:
-            river_ehs = joblib.load(self.ehs_river_path)
+            with open(self.ehs_river_path, 'rb') as f:
+                river_ehs = pickle.load(f)
             log.info("loaded river ehs")
         except FileNotFoundError:
             def batch_tasker(batch, cursor, result):
@@ -193,7 +205,8 @@ class CardInfoLutBuilder(CardCombos):
             river_ehs, river_ehs_sm = multiprocess_ehs_calc(
                 self.river, batch_tasker, river_size
             )
-            joblib.dump(river_ehs, self.ehs_river_path)
+            with open(self.ehs_river_path, 'wb') as f:
+                pickle.dump(river_ehs, f)
 
         self.centroids["river"], self._river_clusters = self.cluster(
             num_clusters=n_river_clusters, X=river_ehs
