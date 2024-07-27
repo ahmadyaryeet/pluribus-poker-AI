@@ -199,6 +199,9 @@ class CardInfoLutBuilder(CardCombos):
         # Process in larger batches
         batch_size = 100_000  # 100,000 combinations per batch
         
+        def process_batch(batch):
+            return [self.process_river_ehs(combo) for combo in batch]
+        
         with tqdm(total=river_size, desc="Processing river combinations") as pbar:
             for i in range(0, river_size, batch_size):
                 end = min(i + batch_size, river_size)
@@ -208,7 +211,7 @@ class CardInfoLutBuilder(CardCombos):
                     break
                 
                 with concurrent.futures.ProcessPoolExecutor() as executor:
-                    batch_results = list(executor.map(self.process_river_ehs, batch))
+                    batch_results = executor.submit(process_batch, batch).result()
                 
                 for j, result in enumerate(batch_results):
                     river_ehs[i+j] = result
@@ -217,7 +220,7 @@ class CardInfoLutBuilder(CardCombos):
                 
                 # Force write to disk
                 river_ehs.flush()
-        
+            
         log.info("Starting KMeans clustering")
         # Clustering
         kmeans = MiniBatchKMeans(n_clusters=n_river_clusters, batch_size=batch_size, n_init=3)
