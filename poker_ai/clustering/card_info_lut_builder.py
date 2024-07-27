@@ -14,6 +14,7 @@ from sklearn.cluster import MiniBatchKMeans
 from scipy.stats import wasserstein_distance
 from tqdm import tqdm
 import itertools
+from multiprocessing import Pool
 
 from poker_ai.clustering.card_combos import CardCombos
 from poker_ai.clustering.combo_lookup import ComboLookup
@@ -24,8 +25,24 @@ from poker_ai.utils.safethread import multiprocess_ehs_calc
 
 log = logging.getLogger("poker_ai.clustering.runner")
 
-def process_batch(self, batch):
-    return [self.process_river_ehs(combo) for combo in batch]
+def process_river_ehs_batch(batch_with_available):
+    results = []
+    for public, available_cards in batch_with_available:
+        our_hand_rank = Evaluator()._seven(public)
+        prob_unit = 1 / 1000  # Assuming n_simulations_river is 1000
+        ehs = np.zeros(3)
+        opp_hand = public.copy()
+        for _ in range(1000):  # Assuming n_simulations_river is 1000
+            opp_hand[:2] = np.random.choice(available_cards, 2, replace=False)
+            opp_hand_rank = Evaluator()._seven(opp_hand)
+            if our_hand_rank > opp_hand_rank:
+                ehs[0] += prob_unit
+            elif our_hand_rank < opp_hand_rank:
+                ehs[1] += prob_unit
+            else:
+                ehs[2] += prob_unit
+        results.append(ehs)
+    return results
 
 class CardInfoLutBuilder(CardCombos):
     def __init__(self, n_simulations_river: int, n_simulations_turn: int, n_simulations_flop: int,
@@ -199,9 +216,6 @@ class CardInfoLutBuilder(CardCombos):
         # Process in larger batches
         batch_size = 100_000  # 100,000 combinations per batch
         
-        def process_batch(batch):
-            return [self.process_river_ehs(combo) for combo in batch]
-        
         with tqdm(total=river_size, desc="Processing river combinations") as pbar:
             for i in range(0, river_size, batch_size):
                 end = min(i + batch_size, river_size)
@@ -210,10 +224,13 @@ class CardInfoLutBuilder(CardCombos):
                 if not batch:  # Check if we've exhausted the generator
                     break
                 
-                with concurrent.futures.ProcessPoolExecutor() as executor:
-                    batch_results = executor.submit(process_batch, batch).result()
+                # Pre-compute available cards for each combo in the batch
+                batch_with_available = [(combo, np.array([c for c in self._cards if c not in combo])) for combo in batch]
                 
-                for j, result in enumerate(batch_results):
+                with Pool() as pool:
+                    batch_results = pool.map(process_river_ehs_batch, [batch_with_available])
+                
+                for j, result in enumerate(batch_results[0]):
                     river_ehs[i+j] = result
                 
                 pbar.update(len(batch))
