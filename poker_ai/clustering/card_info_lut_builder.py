@@ -191,7 +191,6 @@ class CardInfoLutBuilder(CardCombos):
         log.info("Starting computation of river clusters.")
         start = time.time()
         self.load_river()
-        river_ehs_sm = None
         river_size = math.comb(len(self._cards), 2) * math.comb(len(self._cards) - 2, 5)
         try:
             with open(self.ehs_river_path, 'rb') as f:
@@ -202,7 +201,7 @@ class CardInfoLutBuilder(CardCombos):
                 for i, x in enumerate(batch):
                     result[cursor + i] = self.process_river_ehs(x)
             
-            river_ehs, river_ehs_sm = multiprocess_ehs_calc(
+            river_ehs = multiprocess_ehs_calc(
                 iter(self.river),
                 batch_tasker,
                 river_size
@@ -217,9 +216,6 @@ class CardInfoLutBuilder(CardCombos):
         log.info(
             f"Finished computation of river clusters - took {end - start} seconds."
         )
-        if river_ehs_sm is not None:
-            river_ehs_sm.close()
-            river_ehs_sm.unlink()
         self.load_river()
         return self.create_card_lookup(self._river_clusters, self.river, river_size)
 
@@ -227,13 +223,12 @@ class CardInfoLutBuilder(CardCombos):
         """Compute turn clusters and create lookup table."""
         log.info("Starting computation of turn clusters.")
         start = time.time()
-        ehs_sm = None
 
         def batch_tasker(batch, cursor, result):
             for i, x in enumerate(batch):
                 result[cursor + i] = self.process_turn_ehs_distributions(x)
         
-        self._turn_ehs_distributions, ehs_sm = multiprocess_ehs_calc(
+        self._turn_ehs_distributions = multiprocess_ehs_calc(
             iter(self.turn),
             batch_tasker,
             len(self.turn),
@@ -246,16 +241,12 @@ class CardInfoLutBuilder(CardCombos):
         end = time.time()
         log.info(f"Finished computation of turn clusters - took {end - start} seconds.")
 
-        ehs_sm.close()
-        ehs_sm.unlink()
-
         return self.create_card_lookup(self._turn_clusters, self.turn)
 
     def _compute_flop_clusters(self, n_flop_clusters: int):
         """Compute flop clusters and create lookup table."""
         log.info("Starting computation of flop clusters.")
         start = time.time()
-        ehs_sm = None
 
         def batch_tasker(batch, cursor, result):
             for i, x in enumerate(batch):
@@ -263,7 +254,7 @@ class CardInfoLutBuilder(CardCombos):
                     self.process_flop_potential_aware_distributions(x)
                 )
         
-        self._flop_potential_aware_distributions, ehs_sm = multiprocess_ehs_calc(
+        self._flop_potential_aware_distributions = multiprocess_ehs_calc(
             iter(self.flop),
             batch_tasker,
             len(self.flop),
@@ -275,9 +266,6 @@ class CardInfoLutBuilder(CardCombos):
         )
         end = time.time()
         log.info(f"Finished computation of flop clusters - took {end - start} seconds.")
-
-        ehs_sm.close()
-        ehs_sm.unlink()
 
         return self.create_card_lookup(self._flop_clusters, self.flop)
 
@@ -386,9 +374,6 @@ class CardInfoLutBuilder(CardCombos):
         -------
             Expected hand strength
         """
-        # our_hand = public[:2]
-        # board = public[2:7]
-
         our_hand_rank = self._evaluator._seven(public)
         available_cards = np.array([c for c in self._cards if c not in public])
         

@@ -1,12 +1,19 @@
 from typing import Optional, Iterable, Callable, Any
 import ctypes
 import multiprocessing
+from multiprocessing.shared_memory import SharedMemory
 import numpy as np
 from tqdm import tqdm
 import logging
 import time
 
 log = logging.getLogger("poker_ai.clustering.multiprocess")
+
+def process_all(batch, cursor, result_size, result_width, result_sm_name, tasker):
+    sm = SharedMemory(result_sm_name)
+    result = np.ndarray((result_size, result_width), dtype=np.double, buffer=sm.buf)
+    tasker(batch, cursor, result)
+    sm.close()
 
 def multiprocess_ehs_calc(
     source_iter: Iterable[Any],
@@ -16,11 +23,8 @@ def multiprocess_ehs_calc(
 ):
     result_size = result_size or len(source_iter)
     result = np.zeros((result_size, result_width), dtype=np.double)
-
-    def process_all(batch, cursor):
-        partial_result = np.zeros((len(batch), result_width), dtype=np.double)
-        tasker(batch, 0, partial_result)
-        result[cursor:cursor + len(batch)] = partial_result
+    result_sm = SharedMemory(name=None, create=True, size=result.nbytes)
+    result = np.ndarray((result_size, result_width), dtype=np.double, buffer=result_sm.buf)
 
     worker_count = multiprocessing.cpu_count()
     batch_size = min(10_000, result_size // worker_count)
@@ -51,13 +55,16 @@ def multiprocess_ehs_calc(
                 break
 
             with multiprocessing.Pool(worker_count) as pool:
-                pool.starmap(process_all, [(batch, cursor + i * batch_size) for i, batch in enumerate(batches)])
+                pool.starmap(process_all, [(batch, cursor + i * batch_size, result_size, result_width, result_sm.name, tasker) for i, batch in enumerate(batches)])
             
             cursor += batch_size * len(batches)
             pbar.update(batch_size * len(batches))
 
             if task_done:
                 break
+    
+    result_sm.close()
+    result_sm.unlink()
     
     return result
 
