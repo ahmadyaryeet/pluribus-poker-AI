@@ -400,9 +400,40 @@ class CardInfoLutBuilder(CardCombos):
             end = min(i + batch_size, total_size)
             batch = list(itertools.islice(card_combos, i, end))
             
-            batch_ehs = np.array([self.process_river_ehs(combo) for combo in batch])
-            batch_clusters = kmeans.predict(batch_ehs)
+            if not batch:
+                log.warning(f"Empty batch at index {i}. Skipping.")
+                continue
+
+            log.info(f"Processing batch of size {len(batch)} at index {i}")
+
+            batch_ehs = []
+            for combo in batch:
+                try:
+                    ehs = self.process_river_ehs(combo)
+                    if ehs.shape != (3,):
+                        log.warning(f"Unexpected EHS shape {ehs.shape} for combo {combo}. Skipping.")
+                        continue
+                    batch_ehs.append(ehs)
+                except Exception as e:
+                    log.error(f"Error processing combo {combo}: {str(e)}")
+                    continue
+
+            batch_ehs = np.array(batch_ehs)
             
+            if batch_ehs.size == 0:
+                log.warning(f"Empty batch_ehs at index {i}. Skipping.")
+                continue
+
+            log.info(f"batch_ehs shape: {batch_ehs.shape}")
+
+            try:
+                batch_clusters = kmeans.predict(batch_ehs)
+            except ValueError as e:
+                log.error(f"Error predicting clusters at index {i}: {str(e)}")
+                log.error(f"batch_ehs shape: {batch_ehs.shape}")
+                log.error(f"First few elements of batch_ehs: {batch_ehs[:5] if batch_ehs.size > 0 else 'Empty'}")
+                continue
+
             for combo, cluster in zip(batch, batch_clusters):
                 lookup[tuple(combo)] = int(cluster)
             
@@ -419,10 +450,14 @@ class CardInfoLutBuilder(CardCombos):
         # Combine all checkpoints
         self.card_info_lut[stage] = {}
         for i in range(0, total_size, batch_size * 10):
-            with open(f"{self.save_dir}/{stage}_lookup_checkpoint_{i}.pkl", 'rb') as f:
-                self.card_info_lut[stage].update(pickle.load(f))
-            
-            # Remove checkpoint file
-            os.remove(f"{self.save_dir}/{stage}_lookup_checkpoint_{i}.pkl")
+            checkpoint_file = f"{self.save_dir}/{stage}_lookup_checkpoint_{i}.pkl"
+            if os.path.exists(checkpoint_file):
+                with open(checkpoint_file, 'rb') as f:
+                    self.card_info_lut[stage].update(pickle.load(f))
+                
+                # Remove checkpoint file
+                os.remove(checkpoint_file)
+            else:
+                log.warning(f"Checkpoint file {checkpoint_file} not found. Skipping.")
         
         log.info(f"Finished creating {stage} lookup table.")
