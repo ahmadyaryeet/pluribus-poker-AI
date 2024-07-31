@@ -3,7 +3,7 @@ use crate::cluster::{strength, util};
 use crate::poker::{card, combo};
 use crate::progress;
 
-use std::time::{Instant};
+use std::time::Instant;
 use std::fs::{File, metadata};
 use std::io::{Write, BufReader, BufRead};
 use std::path::Path;
@@ -50,48 +50,51 @@ fn load_centroids(file_path: &str) -> Vec<Vec<f64>> {
     result
 }
 
-fn save_combos(combos: &Vec<Vec<i32>>, file_path: &str) {
-    ensure_directory_exists("./output").unwrap();
+fn save_combos(combos: &Vec<Vec<i32>>, file_path: &str) -> std::io::Result<()> {
+    ensure_directory_exists("./output")?;
 
     let progress = progress::new(combos.len() as u64);
 
-    let mut file = File::create(file_path).unwrap();
+    let mut file = File::create(file_path)?;
     for row in combos.iter() {
         let row_str = row.iter().map(|&x| x.to_string()).collect::<Vec<String>>().join(",");
-        writeln!(file, "{}", row_str).unwrap();
+        writeln!(file, "{}", row_str)?;
         progress.inc(1);
     }
 
     progress.finish();
+    Ok(())
 }
 
-fn save_centroids(centroids: &Vec<Vec<f64>>, file_path: &str) {
-    ensure_directory_exists("./output").unwrap();
+fn save_centroids(centroids: &Vec<Vec<f64>>, file_path: &str) -> std::io::Result<()> {
+    ensure_directory_exists("./output")?;
 
     let progress = progress::new(centroids.len() as u64);
 
-    let mut file = File::create(file_path).unwrap();
+    let mut file = File::create(file_path)?;
     for row in centroids.iter() {
         let row_str = row.iter().map(|&x| x.to_string()).collect::<Vec<String>>().join(",");
-        writeln!(file, "{}", row_str).unwrap();
+        writeln!(file, "{}", row_str)?;
         progress.inc(1);
     }
 
     progress.finish();
+    Ok(())
 }
 
-fn save_clusters(clusters: &Vec<u32>, file_path: &str) {
-    ensure_directory_exists("./output").unwrap();
+fn save_clusters(clusters: &Vec<u32>, file_path: &str) -> std::io::Result<()> {
+    ensure_directory_exists("./output")?;
 
     let progress = progress::new(clusters.len() as u64);
 
-    let mut file = File::create(file_path).unwrap();
+    let mut file = File::create(file_path)?;
     for row in clusters.iter() {
-        writeln!(file, "{}", row.to_string()).unwrap();
+        writeln!(file, "{}", row.to_string())?;
         progress.inc(1);
     }
 
     progress.finish();
+    Ok(())
 }
 
 fn build_river_lut(
@@ -142,25 +145,33 @@ fn build_river_lut(
 
     println!("Writing River combos.");
     start_time = Instant::now();
-    save_combos(&river_combos, "./output/river_combos.txt");
+    if let Err(e) = save_combos(&river_combos, "./output/river_combos.txt") {
+        eprintln!("Failed to write River combos: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote River combos in {:?}.", elapsed_time);
-    
+
     println!("Writing River centroids.");
     start_time = Instant::now();
-    save_centroids(&centroids, "./output/river_centroids.txt");
+    if let Err(e) = save_centroids(&centroids, "./output/river_centroids.txt") {
+        eprintln!("Failed to write River centroids: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote River centroids in {:?}.", elapsed_time);
 
     println!("Writing River centroids with limited cluster counts.");
     start_time = Instant::now();
-    save_centroids(&limited_centroids, "./output/river_centroids_limited.txt");
+    if let Err(e) = save_centroids(&limited_centroids, "./output/river_centroids_limited.txt") {
+        eprintln!("Failed to write River centroids with limited cluster counts: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote River centroids in {:?}.", elapsed_time);
-    
+
     println!("Writing River clusters.");
     start_time = Instant::now();
-    save_clusters(&clusters, "./output/river_clusters.txt");
+    if let Err(e) = save_clusters(&clusters, "./output/river_clusters.txt") {
+        eprintln!("Failed to write River clusters: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote River clusters in {:?}.", elapsed_time);
 
@@ -219,25 +230,33 @@ fn build_turn_lut(
 
     println!("Writing Turn combos.");
     start_time = Instant::now();
-    save_combos(&turn_combos, "./output/turn_combos.txt");
+    if let Err(e) = save_combos(&turn_combos, "./output/turn_combos.txt") {
+        eprintln!("Failed to write Turn combos: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Turn combos in {:?}.", elapsed_time);
 
     println!("Writing Turn centroids.");
     start_time = Instant::now();
-    save_centroids(&centroids, "./output/turn_centroids.txt");
+    if let Err(e) = save_centroids(&centroids, "./output/turn_centroids.txt") {
+        eprintln!("Failed to write Turn centroids: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Turn centroids in {:?}.", elapsed_time);
 
     println!("Writing Turn centroids with limited cluster counts.");
     start_time = Instant::now();
-    save_centroids(&limited_centroids, "./output/turn_centroids_limited.txt");
+    if let Err(e) = save_centroids(&limited_centroids, "./output/turn_centroids_limited.txt") {
+        eprintln!("Failed to write Turn centroids with limited cluster counts: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Turn centroids in {:?}.", elapsed_time);
-    
+
     println!("Writing Turn clusters.");
     start_time = Instant::now();
-    save_clusters(&clusters, "./output/turn_clusters.txt");
+    if let Err(e) = save_clusters(&clusters, "./output/turn_clusters.txt") {
+        eprintln!("Failed to write Turn clusters: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Turn clusters in {:?}.", elapsed_time);
 
@@ -285,19 +304,25 @@ fn build_flop_lut(
 
     println!("Writing Flop combos.");
     start_time = Instant::now();
-    save_combos(&flop_combos, "./output/flop_combos.txt");
+    if let Err(e) = save_combos(&flop_combos, "./output/flop_combos.txt") {
+        eprintln!("Failed to write Flop combos: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Flop combos in {:?}.", elapsed_time);
 
     println!("Writing Flop centroids.");
     start_time = Instant::now();
-    save_centroids(&centroids, "./output/flop_centroids.txt");
+    if let Err(e) = save_centroids(&centroids, "./output/flop_centroids.txt") {
+        eprintln!("Failed to write Flop centroids: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Flop centroids in {:?}.", elapsed_time);
-    
+
     println!("Writing Flop clusters.");
     start_time = Instant::now();
-    save_clusters(&clusters, "./output/flop_clusters.txt");
+    if let Err(e) = save_clusters(&clusters, "./output/flop_clusters.txt") {
+        eprintln!("Failed to write Flop clusters: {}", e);
+    }
     elapsed_time = Instant::now() - start_time;
     println!("Wrote Flop clusters in {:?}.", elapsed_time);
 
