@@ -27,7 +27,7 @@ impl EmdCalculator {
             }
         }
 
-        let calc_emd_path = cargo_toml_dir.join("target/release/calc_emd");
+        let calc_emd_path = cargo_toml_dir.join("extern/calc_emd");
         
         let mut child = Command::new(calc_emd_path)
             .stdin(Stdio::piped())
