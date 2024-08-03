@@ -66,12 +66,10 @@ impl EmdCalculator {
             b.iter().map(|&num| num.to_string()).collect::<Vec<String>>().join(",")
         );
 
-        println!("Input to calc_emd: {}", input);
 
         self.child_stdin.write_all(input.as_bytes())?;
         let mut output = String::new();
         self.child_stdout.read_line(&mut output)?;
-        println!("Output from calc_emd: {}", output);
         output.trim().parse::<f64>().map_err(|e| e.into())
     }
 
