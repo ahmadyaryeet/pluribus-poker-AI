@@ -30,7 +30,7 @@ impl EmdCalculator {
 
         println!("Cargo.toml directory: {:?}", cargo_toml_dir);
 
-        let calc_emd_path = cargo_toml_dir.join("extern/calc_emd");
+        let calc_emd_path = cargo_toml_dir.join("target/release/calc_emd");
         println!("calc_emd path: {:?}", calc_emd_path);
 
         if !calc_emd_path.exists() {
