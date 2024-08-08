@@ -282,9 +282,13 @@ fn save_intermediate_flop_strengths(strengths: &Vec<Vec<u8>>, file_path: &str) -
 fn load_intermediate_flop_strengths(file_path: &str) -> Vec<Vec<u8>> {
     let file = File::open(file_path).unwrap();
     let reader = BufReader::new(file);
-    let mut result: Vec<Vec<u8>> = Vec::new();
+    let line_count = reader.lines().count();
 
-    let progress = progress::new(reader.lines().count() as u64);
+    let file = File::open(file_path).unwrap();
+    let reader = BufReader::new(file);
+    let mut result: Vec<Vec<u8>> = Vec::with_capacity(line_count);
+
+    let progress = progress::new(line_count as u64);
 
     for line in reader.lines() {
         let line = line.unwrap();
