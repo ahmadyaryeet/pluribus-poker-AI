@@ -263,6 +263,43 @@ fn build_turn_lut(
     (limited_centroids, clusters)
 }
 
+fn save_intermediate_flop_strengths(strengths: &Vec<Vec<u8>>, file_path: &str) -> std::io::Result<()> {
+    ensure_directory_exists("./output")?;
+
+    let progress = progress::new(strengths.len() as u64);
+
+    let mut file = File::create(file_path)?;
+    for row in strengths.iter() {
+        let row_str = row.iter().map(|&x| x.to_string()).collect::<Vec<String>>().join(",");
+        writeln!(file, "{}", row_str)?;
+        progress.inc(1);
+    }
+
+    progress.finish();
+    Ok(())
+}
+
+fn load_intermediate_flop_strengths(file_path: &str) -> Vec<Vec<u8>> {
+    let file = File::open(file_path).unwrap();
+    let reader = BufReader::new(file);
+    let mut result: Vec<Vec<u8>> = Vec::new();
+
+    let progress = progress::new(reader.lines().count() as u64);
+
+    for line in reader.lines() {
+        let line = line.unwrap();
+        let values: Vec<u8> = line
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        result.push(values);
+        progress.inc(1);
+    }
+    progress.finish();
+
+    result
+}
+
 fn build_flop_lut(
     deck: &Vec<i32>,
     start_combos: &Vec<Vec<i32>>,
@@ -276,22 +313,35 @@ fn build_flop_lut(
     let mut elapsed_time = Instant::now() - start_time;
     println!("Created Flop combos in {:?}.", elapsed_time);
 
-    println!("Simulating Flop hand strengths.");
-    start_time = Instant::now();
-    let result = strength::simulate_flop_hand_strengths(
-        deck,
-        &flop_combos,
-        lookup,
-        river_centroids,
-        turn_centroids,
-        RIVER_SIMULATION_COUNT,
-        TURN_SIMULATION_COUNT,
-        FLOP_SIMULATION_COUNT,
-        RIVER_CLUSTER_COUNT_LIMIT,
-        TURN_CLUSTER_COUNT_LIMIT,
-    );
-    elapsed_time = Instant::now() - start_time;
-    println!("Simulated Flop hand strengths in {:?}.", elapsed_time);
+    let intermediate_file_path = "./output/flop_strengths_intermediate.txt";
+    let result: Vec<Vec<u8>>;
+
+    if metadata(intermediate_file_path).is_ok() {
+        println!("Loading intermediate Flop hand strengths.");
+        result = load_intermediate_flop_strengths(intermediate_file_path);
+    } else {
+        println!("Simulating Flop hand strengths.");
+        start_time = Instant::now();
+        result = strength::simulate_flop_hand_strengths(
+            deck,
+            &flop_combos,
+            lookup,
+            river_centroids,
+            turn_centroids,
+            RIVER_SIMULATION_COUNT,
+            TURN_SIMULATION_COUNT,
+            FLOP_SIMULATION_COUNT,
+            RIVER_CLUSTER_COUNT_LIMIT,
+            TURN_CLUSTER_COUNT_LIMIT,
+        );
+        elapsed_time = Instant::now() - start_time;
+        println!("Simulated Flop hand strengths in {:?}.", elapsed_time);
+
+        println!("Saving intermediate Flop hand strengths.");
+        if let Err(e) = save_intermediate_flop_strengths(&result, intermediate_file_path) {
+            eprintln!("Failed to save intermediate Flop hand strengths: {}", e);
+        }
+    }
 
     println!("Clustering Flop combos.");
     start_time = Instant::now();
