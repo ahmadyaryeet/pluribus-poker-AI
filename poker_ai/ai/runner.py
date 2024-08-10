@@ -145,12 +145,12 @@ def resume(server_config_path: str):
 @click.option(
     "--n_iterations",
     #default=250,
-    default = 500,
+    default = 5000,
     help="The total number of iterations we should train the model for.",
 )
 @click.option(
     "--lcfr_threshold",
-    default=400,
+    default=1000,
     #default=150,
     help=(
         "A threshold for linear CFR which means don't apply discounting "
@@ -159,7 +159,7 @@ def resume(server_config_path: str):
 )
 @click.option(
     "--discount_interval",
-    default=400,
+    default=1000,
     #default=150,
     help=(
         "Discount the current regret and strategy whenever iteration % "
@@ -168,7 +168,7 @@ def resume(server_config_path: str):
 )
 @click.option(
     "--prune_threshold",
-    default=400,
+    default=1000,
     #default=150,
     help=(
         "When a uniform random number is less than 95%, and the iteration > "
@@ -197,7 +197,7 @@ def resume(server_config_path: str):
 @click.option(
     "--update_threshold",
     #default=150,
-    default=400,
+    default=1000,
     help=(
         "When the iteration is greater than update_threshold we can start "
         "updating the strategy."
