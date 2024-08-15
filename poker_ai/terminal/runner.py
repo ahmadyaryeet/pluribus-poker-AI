@@ -93,7 +93,7 @@ def run_terminal_app(
     names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "HUMAN"}
     if not debug_quick_start and agent in {"offline", "online"}:
         print("Pre loading")
-        offline_strategy_dict = joblib.load(strategy_path)
+        offline_strategy_dict = joblib.load(strategy_path, mmap_mode='r')
         print("post Loading")
         offline_strategy = offline_strategy_dict['strategy']
         # Using the more fine grained preflop strategy would be a good idea
