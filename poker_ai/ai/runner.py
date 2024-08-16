@@ -145,7 +145,7 @@ def resume(server_config_path: str):
 @click.option(
     "--n_iterations",
     #default=250,
-    default = 5000,
+    default = 3500,
     help="The total number of iterations we should train the model for.",
 )
 @click.option(
