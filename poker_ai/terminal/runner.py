@@ -283,8 +283,8 @@ def select_runner():
             lut_path=".",
             pickle_dir=False,
             agent="offline",
-            strategy_path="./_2024_07_10_19_16_31_142882/agent.joblib",
-            previous_strategy_path="./_2024_07_10_19_16_31_142882/agent.joblib",
+            strategy_path="./_2024_08_16_05_59_24_726841/agent.joblib",
+            previous_strategy_path="./_2024_08_09_18_55_49_280081/agent.joblib",
             debug_quick_start=False
         )
     
