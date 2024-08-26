@@ -73,7 +73,7 @@ def run_terminal_app(
         --no_debug_quick_start
     ```
     """
-     term = Terminal()
+    term = Terminal()
     log = AsciiLogger(term)
     n_players: int = 6
     include_ranks = list(range(low_card_rank, high_card_rank + 1))
