@@ -303,11 +303,32 @@ def run_progress_checker(
     log.height = term.height
     log.info("Running progress checker...")
 
-    # Load the strategies only once at the beginning
-    current_strategy_dict = joblib.load(strategy_path)
-    current_strategy = current_strategy_dict['strategy']
-    previous_strategy_dict = joblib.load(previous_strategy_path)
-    previous_strategy = previous_strategy_dict['strategy']
+    # Load the strategies using the load_strategy function
+    print("Loading current strategy...")
+    print_memory_usage()
+    current_strategy_dict = load_strategy(strategy_path)
+    print("Current strategy loaded successfully")
+    print("Keys in current strategy data:", current_strategy_dict.keys())
+    
+    if 'strategy' in current_strategy_dict:
+        current_strategy = current_strategy_dict['strategy']
+    else:
+        print("'strategy' key not found in current strategy. Using entire loaded data as strategy.")
+        current_strategy = current_strategy_dict
+    
+    print("Loading previous strategy...")
+    print_memory_usage()
+    previous_strategy_dict = load_strategy(previous_strategy_path)
+    print("Previous strategy loaded successfully")
+    print("Keys in previous strategy data:", previous_strategy_dict.keys())
+    
+    if 'strategy' in previous_strategy_dict:
+        previous_strategy = previous_strategy_dict['strategy']
+    else:
+        print("'strategy' key not found in previous strategy. Using entire loaded data as strategy.")
+        previous_strategy = previous_strategy_dict
+
+    print_memory_usage()
 
     # Load the card_info_lut once
     card_info_lut = ShortDeckPokerState.load_card_lut(
@@ -323,6 +344,7 @@ def run_progress_checker(
 
     n_players = 6
     user_results: UserResults = UserResults()
+
 
     while True:
         games_played = 0
