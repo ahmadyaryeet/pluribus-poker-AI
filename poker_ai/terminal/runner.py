@@ -422,7 +422,6 @@ def run_progress_checker(
         
 
     print("Final Results:")
-    print(user_results.get_summary())
 
 if __name__ == "__main__":
     select_runner()
