@@ -345,22 +345,31 @@ def run_progress_checker(
     n_players = 6
     user_results: UserResults = UserResults()
 
+    total_games = 5000
+    games_per_reset = 100
+    total_hands = 0
+    current_ai_wins = 0
+    current_ai_money = 0
+    previous_ai_wins = 0
+    previous_ai_money = 0
 
-    while True:
-        games_played = 0
-        max_games = 50
-        total_hands = 0
-        current_ai_wins = 0
-        current_ai_money = 0
-        previous_ai_wins = 0
-        previous_ai_money = 0
+    for reset_count in range(total_games // games_per_reset):
+        print(f"\nStarting set {reset_count + 1} of {total_games // games_per_reset}")
+        
+        # Reset game state
+        card_info_lut = ShortDeckPokerState.load_card_lut(
+            lut_path=lut_path,
+            pickle_dir=pickle_dir,
+            low_card_rank=low_card_rank,
+            high_card_rank=high_card_rank
+        )
 
-        while games_played < max_games:
+        for game in range(games_per_reset):
             state: ShortDeckPokerState = new_game(
                 n_players=n_players,
                 include_ranks=list(range(low_card_rank, high_card_rank + 1)),
-                card_info_lut=card_info_lut,  # Pass the pre-loaded card_info_lut
-                load_card_lut=False  # Set this to False to avoid reloading
+                card_info_lut=card_info_lut,
+                load_card_lut=False
             )
 
             hands_this_game = 0
@@ -381,7 +390,6 @@ def run_progress_checker(
                 probabilities = list(this_state_strategy.values())
                 action = np.random.choice(actions, p=probabilities)
                 
-                log.info(f"{names[positions[state.players.index(state.current_player)]]} chose {action}")
                 state = state.apply_action(action)
 
             # Game ended
@@ -398,25 +406,29 @@ def run_progress_checker(
                         previous_ai_wins += 1
                     previous_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
 
-            games_played += 1
-
-        print(term.home + term.white + term.clear)
-        print_log(term, log)
-        
-        print("\nStatistics after 5 games:")
+        # Print progress after each reset
+        games_played = (reset_count + 1) * games_per_reset
+        print(f"\nProgress after {games_played} games:")
         print(f"Total hands played: {total_hands}")
         print(f"Current AI wins: {current_ai_wins}")
         print(f"Previous AI wins: {previous_ai_wins}")
         print(f"Current AI total money won/lost: ${current_ai_money}")
         print(f"Previous AI total money won/lost: ${previous_ai_money}")
-        print(f"Current AI average money per game: ${current_ai_money / max_games:.2f}")
-        print(f"Previous AI average money per game: ${previous_ai_money / (max_games * 5):.2f}")
-        
-        user_input = input("50 games completed. Enter 'q' to quit or any other key to continue: ")
-        if user_input.lower() == 'q':
-            break
+        print(f"Current AI average money per game: ${current_ai_money / games_played:.2f}")
+        print(f"Previous AI average money per game: ${previous_ai_money / (games_played * 5):.2f}")
+
+    print("\nFinal Results after 5000 games:")
+    print(f"Total hands played: {total_hands}")
+    print(f"Current AI wins: {current_ai_wins}")
+    print(f"Previous AI wins: {previous_ai_wins}")
+    print(f"Current AI total money won/lost: ${current_ai_money}")
+    print(f"Previous AI total money won/lost: ${previous_ai_money}")
+    print(f"Current AI average money per game: ${current_ai_money / total_games:.2f}")
+    print(f"Previous AI average money per game: ${previous_ai_money / (total_games * 5):.2f}")
 
     log.info("Finished comparing strategies.")
+        
+
     print("Final Results:")
     print(user_results.get_summary())
 
