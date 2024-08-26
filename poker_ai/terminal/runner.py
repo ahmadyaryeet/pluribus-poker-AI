@@ -134,16 +134,25 @@ def run_terminal_app(
         try:
             offline_strategy_dict = load_strategy(strategy_path)
             print("Strategy loaded successfully")
+            print("Keys in loaded data:", offline_strategy_dict.keys())
+            
+            if 'strategy' in offline_strategy_dict:
+                offline_strategy = offline_strategy_dict['strategy']
+            else:
+                print("'strategy' key not found. Using entire loaded data as strategy.")
+                offline_strategy = offline_strategy_dict
+            
+            # Using the more fine grained preflop strategy would be a good idea
+            # for a future improvement
+            if 'pre_flop_strategy' in offline_strategy_dict:
+                del offline_strategy_dict["pre_flop_strategy"]
+            if 'regret' in offline_strategy_dict:
+                del offline_strategy_dict["regret"]
+            
         except Exception as e:
             print(f"Error loading file: {e}")
         print_memory_usage()
         print("post Loading")
-        offline_strategy = offline_strategy_dict['strategy']
-        # Using the more fine grained preflop strategy would be a good idea
-        # for a future improvement
-        del offline_strategy_dict["pre_flop_strategy"]
-        del offline_strategy_dict["regret"]
-
 
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
