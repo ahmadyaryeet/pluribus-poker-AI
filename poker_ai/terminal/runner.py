@@ -283,8 +283,8 @@ def select_runner():
             lut_path="lut://0.0.0.0:8989",
             pickle_dir=False,
             agent="offline",
-            strategy_path="./_2024_08_16_05_59_24_726841/agent.joblib",
-            previous_strategy_path="./_2024_08_09_18_55_49_280081/agent.joblib",
+            strategy_path="./_2024_08_10_01_29_30_879636/agent.joblib",
+            previous_strategy_path="./_2024_08_16_05_59_24_726841/agent.joblib",
             debug_quick_start=False
         )
     
@@ -318,7 +318,7 @@ def run_progress_checker(
     
     print("Loading previous strategy...")
     print_memory_usage()
-    previous_strategy_dict = joblib.load(previous_strategy_path)
+    previous_strategy_dict = load_strategy(previous_strategy_path)
     print("Previous strategy loaded successfully")
     print("Keys in previous strategy data:", previous_strategy_dict.keys())
     
@@ -345,8 +345,8 @@ def run_progress_checker(
     n_players = 6
     user_results: UserResults = UserResults()
 
-    total_games = 5000
-    games_per_reset = 100
+    total_games = 10000
+    games_per_reset = 50
     total_hands = 0
     current_ai_wins = 0
     current_ai_money = 0
