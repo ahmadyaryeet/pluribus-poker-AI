@@ -76,10 +76,8 @@ def run_terminal_app(
     term = Terminal()
     log = AsciiLogger(term)
     n_players: int = 6
+    # n_players: int = 3
     include_ranks = list(range(low_card_rank, high_card_rank + 1))
-
-    print_memory_usage()  # Print memory usage before loading the game state
-
     if debug_quick_start:
         state: ShortDeckPokerState = new_game(
             n_players,
@@ -94,46 +92,27 @@ def run_terminal_app(
             pickle_dir=pickle_dir,
             include_ranks=include_ranks,
         )
-    
-    print_memory_usage()  # Print memory usage after initializing the game state
-
     n_table_rotations: int = 0
     selected_action_i: int = 0
+    # positions = ["left", "middle", "right"]
+    # names = {"left": "BOT 1", "middle": "BOT 2", "right": "HUMAN"}
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "HUMAN"}
-
     if not debug_quick_start and agent in {"offline", "online"}:
-        print("Pre-loading")
-        print_memory_usage()  # Print memory usage before loading the strategy
+        print("Pre loading")
         try: 
-            # Load the strategy file in steps
-            with joblib.load(strategy_path, mmap_mode='r') as offline_strategy_dict:
-                print_memory_usage()  # Check memory after loading the entire file
-                print("Loaded strategy dictionary keys:", offline_strategy_dict.keys())
-
-                # Load each part separately to see if a specific part is causing issues
-                offline_strategy = offline_strategy_dict['strategy']
-                print_memory_usage()  # Check memory after loading strategy
-                print("Loaded strategy")
-                
-                if 'pre_flop_strategy' in offline_strategy_dict:
-                    pre_flop_strategy = offline_strategy_dict['pre_flop_strategy']
-                    print("Loaded pre_flop_strategy")
-                    del offline_strategy_dict["pre_flop_strategy"]
-                
-                if 'regret' in offline_strategy_dict:
-                    regret = offline_strategy_dict['regret']
-                    print("Loaded regret")
-                    del offline_strategy_dict["regret"]
-                
-                print_memory_usage()  # Check memory after deleting parts
+            print_memory_usage()
+            offline_strategy_dict = joblib.load(strategy_path, mmap_mode='r')
+            print_memory_usage()
         except Exception as e:
             print(f"Error loading file {e}")
-        print("Post-loading")
-        print_memory_usage()  # Print memory usage after loading the strategy
+        print("post Loading")
+        offline_strategy = offline_strategy_dict['strategy']
+        # Using the more fine grained preflop strategy would be a good idea
+        # for a future improvement
+        del offline_strategy_dict["pre_flop_strategy"]
+        del offline_strategy_dict["regret"]
 
-    else:
-        offline_strategy = {}
 
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
