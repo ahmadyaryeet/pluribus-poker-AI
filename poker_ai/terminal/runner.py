@@ -22,6 +22,34 @@ def print_memory_usage():
     mem_info = process.memory_info()
     print(f"Memory Usage: {mem_info.rss / (1024 * 1024):.2f} MB")
 
+def chunked_load(file_path, chunk_size=500*1024*1024):  # 500 MB chunks
+    with open(file_path, 'rb') as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+
+def load_strategy(strategy_path):
+    strategy = {}
+    total_size = os.path.getsize(strategy_path)
+    loaded_size = 0
+    
+    unpickler = pickle.Unpickler(open(strategy_path, 'rb'))
+    
+    for chunk in chunked_load(strategy_path):
+        loaded_size += len(chunk)
+        while chunk:
+            try:
+                part = unpickler.load()
+                if isinstance(part, dict):
+                    strategy.update(part)
+                chunk = chunk[unpickler.tell():]
+            except EOFError:
+                break
+        print(f"Loaded {loaded_size / total_size * 100:.2f}% of the strategy")
+    
+    return strategy
 
 @click.command()
 @click.option(
@@ -100,12 +128,13 @@ def run_terminal_app(
     names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "HUMAN"}
     if not debug_quick_start and agent in {"offline", "online"}:
         print("Pre loading")
-        try: 
-            print_memory_usage()
-            offline_strategy_dict = joblib.load(strategy_path, mmap_mode='r')
-            print_memory_usage()
+        print_memory_usage()
+        try:
+            offline_strategy_dict = load_strategy(strategy_path)
+            print("Strategy loaded successfully")
         except Exception as e:
-            print(f"Error loading file {e}")
+            print(f"Error loading file: {e}")
+        print_memory_usage()
         print("post Loading")
         offline_strategy = offline_strategy_dict['strategy']
         # Using the more fine grained preflop strategy would be a good idea
