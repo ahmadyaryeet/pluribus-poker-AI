@@ -318,7 +318,7 @@ def run_progress_checker(
     
     print("Loading previous strategy...")
     print_memory_usage()
-    previous_strategy_dict = load_strategy(previous_strategy_path)
+    previous_strategy_dict = joblib.load(previous_strategy_path)
     print("Previous strategy loaded successfully")
     print("Keys in previous strategy data:", previous_strategy_dict.keys())
     
