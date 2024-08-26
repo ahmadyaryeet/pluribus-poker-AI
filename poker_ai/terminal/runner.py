@@ -6,6 +6,7 @@ import click
 import joblib
 import numpy as np
 from blessed import Terminal
+import psutil
 
 from poker_ai.games.short_deck.state import new_game, ShortDeckPokerState
 from poker_ai.terminal.ascii_objects.card_collection import AsciiCardCollection
@@ -14,6 +15,12 @@ from poker_ai.terminal.ascii_objects.logger import AsciiLogger
 from poker_ai.terminal.render import print_footer, print_header, print_log, print_table
 from poker_ai.terminal.results import UserResults
 from poker_ai.utils.algos import rotate_list
+
+def print_memory_usage():
+    """Print the current memory usage."""
+    process = psutil.Process()
+    mem_info = process.memory_info()
+    print(f"Memory Usage: {mem_info.rss / (1024 * 1024):.2f} MB")
 
 
 @click.command()
@@ -69,8 +76,10 @@ def run_terminal_app(
     term = Terminal()
     log = AsciiLogger(term)
     n_players: int = 6
-    # n_players: int = 3
     include_ranks = list(range(low_card_rank, high_card_rank + 1))
+
+    print_memory_usage()  # Print memory usage before loading the game state
+
     if debug_quick_start:
         state: ShortDeckPokerState = new_game(
             n_players,
@@ -85,19 +94,24 @@ def run_terminal_app(
             pickle_dir=pickle_dir,
             include_ranks=include_ranks,
         )
+    
+    print_memory_usage()  # Print memory usage after initializing the game state
+
     n_table_rotations: int = 0
     selected_action_i: int = 0
-    # positions = ["left", "middle", "right"]
-    # names = {"left": "BOT 1", "middle": "BOT 2", "right": "HUMAN"}
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "HUMAN"}
+
     if not debug_quick_start and agent in {"offline", "online"}:
-        print("Pre loading")
+        print("Pre-loading")
+        print_memory_usage()  # Print memory usage before loading the strategy
         try: 
             offline_strategy_dict = joblib.load(strategy_path, mmap_mode='r')
         except Exception as e:
             print(f"Error loading file {e}")
-        print("post Loading")
+        print("Post-loading")
+        print_memory_usage()  # Print memory usage after loading the strategy
+
         offline_strategy = offline_strategy_dict['strategy']
         # Using the more fine grained preflop strategy would be a good idea
         # for a future improvement
@@ -225,6 +239,7 @@ def run_terminal_app(
 def select_runner():
     user_input = input("Type '1' if you want to play against the AI, Type '2' if you want the AI to play against a previous version of itself: ")
     if user_input == '1':
+        
         run_terminal_app()
     elif user_input == '2':
         run_progress_checker(
