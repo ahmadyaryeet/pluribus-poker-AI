@@ -280,7 +280,7 @@ def select_runner():
         run_progress_checker(
             low_card_rank=2,
             high_card_rank=14,
-            lut_path=".",
+            lut_path="lut://0.0.0.0:8989",
             pickle_dir=False,
             agent="offline",
             strategy_path="./_2024_08_16_05_59_24_726841/agent.joblib",
