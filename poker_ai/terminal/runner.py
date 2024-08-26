@@ -73,7 +73,7 @@ def run_terminal_app(
         --no_debug_quick_start
     ```
     """
-    term = Terminal()
+     term = Terminal()
     log = AsciiLogger(term)
     n_players: int = 6
     include_ranks = list(range(low_card_rank, high_card_rank + 1))
@@ -106,19 +106,35 @@ def run_terminal_app(
         print("Pre-loading")
         print_memory_usage()  # Print memory usage before loading the strategy
         try: 
-            offline_strategy_dict = joblib.load(strategy_path, mmap_mode='r')
+            # Load the strategy file in steps
+            with joblib.load(strategy_path, mmap_mode='r') as offline_strategy_dict:
+                print_memory_usage()  # Check memory after loading the entire file
+                print("Loaded strategy dictionary keys:", offline_strategy_dict.keys())
+
+                # Load each part separately to see if a specific part is causing issues
+                offline_strategy = offline_strategy_dict['strategy']
+                print_memory_usage()  # Check memory after loading strategy
+                print("Loaded strategy")
+                
+                if 'pre_flop_strategy' in offline_strategy_dict:
+                    pre_flop_strategy = offline_strategy_dict['pre_flop_strategy']
+                    print("Loaded pre_flop_strategy")
+                    del offline_strategy_dict["pre_flop_strategy"]
+                
+                if 'regret' in offline_strategy_dict:
+                    regret = offline_strategy_dict['regret']
+                    print("Loaded regret")
+                    del offline_strategy_dict["regret"]
+                
+                print_memory_usage()  # Check memory after deleting parts
         except Exception as e:
             print(f"Error loading file {e}")
         print("Post-loading")
         print_memory_usage()  # Print memory usage after loading the strategy
 
-        offline_strategy = offline_strategy_dict['strategy']
-        # Using the more fine grained preflop strategy would be a good idea
-        # for a future improvement
-        del offline_strategy_dict["pre_flop_strategy"]
-        del offline_strategy_dict["regret"]
     else:
         offline_strategy = {}
+
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
         while True:
