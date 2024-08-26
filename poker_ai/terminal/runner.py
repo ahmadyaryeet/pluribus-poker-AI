@@ -356,14 +356,6 @@ def run_progress_checker(
     for reset_count in range(total_games // games_per_reset):
         print(f"\nStarting set {reset_count + 1} of {total_games // games_per_reset}")
         
-        # Reset game state
-        card_info_lut = ShortDeckPokerState.load_card_lut(
-            lut_path=lut_path,
-            pickle_dir=pickle_dir,
-            low_card_rank=low_card_rank,
-            high_card_rank=high_card_rank
-        )
-
         for game in range(games_per_reset):
             state: ShortDeckPokerState = new_game(
                 n_players=n_players,
@@ -410,12 +402,12 @@ def run_progress_checker(
         games_played = (reset_count + 1) * games_per_reset
         print(f"\nProgress after {games_played} games:")
         print(f"Total hands played: {total_hands}")
-        print(f"Current AI wins: {current_ai_wins}")
-        print(f"Previous AI wins: {previous_ai_wins}")
-        print(f"Current AI total money won/lost: ${current_ai_money}")
-        print(f"Previous AI total money won/lost: ${previous_ai_money}")
-        print(f"Current AI average money per game: ${current_ai_money / games_played:.2f}")
-        print(f"Previous AI average money per game: ${previous_ai_money / (games_played * 5):.2f}")
+        ###print(f"Current AI wins: {current_ai_wins}")
+        ###print(f"Previous AI wins: {previous_ai_wins}")
+        ###print(f"Current AI total money won/lost: ${current_ai_money}")
+        ###print(f"Previous AI total money won/lost: ${previous_ai_money}")
+        ###print(f"Current AI average money per game: ${current_ai_money / games_played:.2f}")
+        ###print(f"Previous AI average money per game: ${previous_ai_money / (games_played * 5):.2f}")
 
     print("\nFinal Results after 5000 games:")
     print(f"Total hands played: {total_hands}")
