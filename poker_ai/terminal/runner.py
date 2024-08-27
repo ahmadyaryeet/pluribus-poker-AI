@@ -398,6 +398,10 @@ def run_self_play_terminal_app(
                         selected_action_i = len(legal_actions) - 1
                 elif key.name == "KEY_RIGHT":
                     selected_action_i = (selected_action_i + 1) % len(legal_actions)
+                elif key.name == "KEY_UP":
+                    state.increment_raise()
+                elif key.name == "KEY_DOWN":
+                    state.decrement_raise()
                 elif key.name == "KEY_ENTER":
                     action = legal_actions[selected_action_i]
                     if action == "quit":

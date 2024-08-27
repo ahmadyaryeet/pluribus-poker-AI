@@ -70,6 +70,7 @@ class SelfPlayShortDeckPokerState:
         self.handle_all_in = handle_all_in
         self.allow_fourth_bet = allow_fourth_bet
         self._pickle_dir = pickle_dir
+        self.current_raise_amount = self.big_blind
         
         self._low_card_rank = min(include_ranks)
         self._high_card_rank = max(include_ranks)
@@ -216,7 +217,7 @@ class SelfPlayShortDeckPokerState:
         elif action_str == "fold":
             action = new_state.current_player.fold()
         elif action_str.startswith("raise"):
-            bet_n_chips = new_state.big_blind
+            bet_n_chips = self.current_raise_amount
             if new_state._betting_stage in {"turn", "river"}:
                 bet_n_chips *= 2
             if len(action_str.split(":")) > 1:
@@ -474,18 +475,20 @@ class SelfPlayShortDeckPokerState:
     @property
     def raise_limit(self) -> int:
         return 4 if self.allow_fourth_bet else 3
+    
+    def increment_raise(self):
+        self.current_raise_amount += 100
+
+    def decrement_raise(self):
+        self.current_raise_amount = max(self.big_blind, self.current_raise_amount - 100)
 
     @property
     def legal_actions(self) -> List[Optional[str]]:
-        """Return the actions that are legal for this game state."""
         actions: List[Optional[str]] = []
         if self.current_player.is_active:
             actions += ["fold", "call"]
             if self._n_raises < self.raise_limit:
-                # In limit hold'em we can only bet/raise if there have been
-                # less than three or four raises in this round of betting, or if there
-                # are two players playing.
-                actions += ["raise"]
+                actions += [f"raise:{self.current_raise_amount}"]
         else:
             actions += [None]
         return actions
