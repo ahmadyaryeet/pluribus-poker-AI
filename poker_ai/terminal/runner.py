@@ -266,8 +266,17 @@ def run_terminal_app(
                     }
                     actions = list(this_state_strategy.keys())
                     probabilties = list(this_state_strategy.values())
+
+                    print("\nAI decision process:")
+                    print(f"Current betting stage: {state.betting_stage}")
+                    print(f"Legal actions: {actions}")
+                    print("Action probabilities:")
+                    for action, prob in zip(actions, probabilties):
+                        print(f"  {action}: {prob:.4f}")
+                    
                     action = np.random.choice(actions, p=probabilties)
-                    time.sleep(0.8)
+                    print(f"Selected action: {action}")
+                    time.sleep(5.0)
                 log.info(f"{current_player_name} chose {action}")
                 state: ShortDeckPokerState = state.apply_action(action)
 
