@@ -333,12 +333,9 @@ def run_self_play_terminal_app(
     with term.cbreak(), term.hidden_cursor():
         while True:
             # Check if we need to deal community cards
-            if state._betting_stage == "flop" and not state._table.community_cards:
-                state._table.dealer.self_play_deal_flop(state._table)
-            elif state._betting_stage == "turn" and len(state._table.community_cards) == 3:
-                state._table.dealer.self_play_deal_turn(state._table)
-            elif state._betting_stage == "river" and len(state._table.community_cards) == 4:
-                state._table.dealer.self_play_deal_river(state._table)
+            if state.needs_card_input():
+                state.input_cards()
+                continue
 
             ascii_players: Dict[str, AsciiPlayer] = {}
             state_players = rotate_list(state.players[::-1], n_table_rotations)

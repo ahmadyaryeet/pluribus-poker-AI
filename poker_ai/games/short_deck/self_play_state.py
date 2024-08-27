@@ -130,6 +130,33 @@ class SelfPlayShortDeckPokerState:
         blind_players = self._poker_engine.smart_assign_blinds()
         blind_players[0].is_small_blind = True
         blind_players[1].is_big_blind = True
+    
+    def input_cards(self):
+        if self._betting_stage == "pre_flop":
+            for i, player in enumerate(self.players):
+                if not player.cards:
+                    cards = self._table.dealer.self_play_get_user_input_cards(f"Player {i+1}'s hand", 2)
+                    player.cards = cards
+        elif self._betting_stage == "flop":
+            cards = self._table.dealer.self_play_get_user_input_cards("flop", 3)
+            self._table.community_cards = cards
+        elif self._betting_stage == "turn":
+            cards = self._table.dealer.self_play_get_user_input_cards("turn", 1)
+            self._table.community_cards.extend(cards)
+        elif self._betting_stage == "river":
+            cards = self._table.dealer.self_play_get_user_input_cards("river", 1)
+            self._table.community_cards.extend(cards)
+
+    def needs_card_input(self) -> bool:
+        if self._betting_stage == "pre_flop" and not all(player.cards for player in self.players):
+            return True
+        if self._betting_stage == "flop" and len(self._table.community_cards) < 3:
+            return True
+        if self._betting_stage == "turn" and len(self._table.community_cards) == 3:
+            return True
+        if self._betting_stage == "river" and len(self._table.community_cards) == 4:
+            return True
+        return False
 
     def skip_players_with_no_chips(self):
         while self.current_player.n_chips == 0:
