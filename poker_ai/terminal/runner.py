@@ -309,7 +309,7 @@ def run_self_play_terminal_app(
         print("Pre loading")
         print_memory_usage()
         try:
-            offline_strategy_dict = load_strategy(strategy_path)
+            offline_strategy_dict = joblib.load(strategy_path)
             print("Strategy loaded successfully")
             print("Keys in loaded data:", offline_strategy_dict.keys())
             
