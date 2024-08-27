@@ -25,6 +25,7 @@ raise_levels = [2, 5, 50]
 def new_self_play_game(
     n_players: int,
     card_info_lut: InfoSetLookupTable = None,
+    big_blind: int = 100,
     **kwargs
 ) -> SelfPlayShortDeckPokerState:
     pot = Pot()
@@ -36,12 +37,14 @@ def new_self_play_game(
         state = SelfPlayShortDeckPokerState(
             players=players,
             card_info_lut=card_info_lut,
+            big_blind=big_blind,
             **kwargs
         )
     else:
         state = SelfPlayShortDeckPokerState(
             players=players,
             card_info_lut=card_info_lut,
+            big_blind=big_blind,
             **kwargs
         )
     return state
@@ -70,7 +73,6 @@ class SelfPlayShortDeckPokerState:
         self.handle_all_in = handle_all_in
         self.allow_fourth_bet = allow_fourth_bet
         self._pickle_dir = pickle_dir
-        self.current_raise_amount = self.big_blind
         
         self._low_card_rank = min(include_ranks)
         self._high_card_rank = max(include_ranks)
@@ -90,6 +92,7 @@ class SelfPlayShortDeckPokerState:
         self._initial_n_chips = players[0].n_chips
         self.small_blind = small_blind
         self.big_blind = big_blind
+        self.current_raise_amount = self.big_blind  # Move this line here
         self._poker_engine = PokerEngine(
             table=self._table,
             small_blind=small_blind,
