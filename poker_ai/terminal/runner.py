@@ -531,14 +531,14 @@ def run_progress_checker(
 
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {
-        "top-left": "Current AI 1", "top-middle": "Current AI 2", "top-right": "Current AI 3",
-        "bottom-left": "Previous AI 1", "bottom-middle": "Previous AI 2", "bottom-right": "Previous AI 3"
+        "top-left": "Current AI 1", "top-middle": "Previous AI 1", "top-right": "Current AI 2",
+        "bottom-left": "Previous AI 2", "bottom-middle": "Current AI 3", "bottom-right": "Previous AI 3"
     }
 
     n_players = 6
     user_results: UserResults = UserResults()
 
-    total_games = 10000
+    total_games = 5000
     games_per_reset = 50
     total_hands = 0
     current_ai_wins = 0
