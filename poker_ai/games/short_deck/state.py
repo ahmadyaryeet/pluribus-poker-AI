@@ -28,6 +28,7 @@ raise_levels = [2, 5, 50]
 def new_game(
     n_players: int,
     card_info_lut: InfoSetLookupTable = None,
+    self_play: bool = False,
     **kwargs
 ) -> ShortDeckPokerState:
     """
@@ -56,6 +57,7 @@ def new_game(
         state = ShortDeckPokerState(
             players=players,
             card_info_lut=card_info_lut,
+            self_play=self_play,
             **kwargs
         )
     else:
@@ -63,6 +65,7 @@ def new_game(
         state = ShortDeckPokerState(
         players=players,
         card_info_lut=card_info_lut,
+        self_play=self_play,
         **kwargs
         )
     return state
@@ -88,6 +91,7 @@ class ShortDeckPokerState:
         without_blinds: bool = False,
         handle_all_in: bool = False,
         allow_fourth_bet: bool = False,
+        self_play: bool = False  
     ):
         """Initialise state."""
         n_players = len(players)
@@ -99,6 +103,7 @@ class ShortDeckPokerState:
         self.handle_all_in = handle_all_in
         self.allow_fourth_bet = allow_fourth_bet
         self._pickle_dir = pickle_dir
+        self.self_play = self_play
         # Store low and high card rank in the instance.
         self._low_card_rank = min(include_ranks)
         self._high_card_rank = max(include_ranks)
@@ -407,6 +412,8 @@ class ShortDeckPokerState:
     def community_cards(self) -> List[Card]:
         """Return all shared/public cards."""
         return self._table.community_cards
+    
+    # Ok here is where we are going to have to substitute communtiy cards to be the cartds we see on the poker site.
 
     @property
     def private_hands(self) -> Dict[ShortDeckPokerPlayer, List[Card]]:

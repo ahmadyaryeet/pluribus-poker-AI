@@ -305,6 +305,8 @@ def run_self_play_terminal_app(
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "HUMAN"}
     
+    
+
     if not debug_quick_start and agent in {"offline", "online"}:
         print("Pre loading")
         print_memory_usage()
@@ -336,6 +338,11 @@ def run_self_play_terminal_app(
             state_players = rotate_list(state.players[::-1], n_table_rotations)
             og_name_to_position = {}
             og_name_to_name = {}
+
+            if state._poker_engine.n_active_players == 1:
+                state._betting_stage = "terminal"
+                if not state._table.community_cards:
+                    state._poker_engine.table.dealer.self_play_deal_flop(state._table)
             for player_i, player in enumerate(state_players):
                 position = positions[player_i]
                 is_human = names[position].lower() == "human"

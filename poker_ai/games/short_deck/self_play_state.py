@@ -508,6 +508,7 @@ class SelfPlayShortDeckPokerState:
         self.players[player_index].cards = cards
 
     def _increment_stage(self):
+        """Once betting has finished, increment the stage of the poker game."""
         if self._betting_stage == "pre_flop":
             self._betting_stage = "flop"
             self._table.dealer.self_play_deal_flop(self._table)
@@ -519,16 +520,27 @@ class SelfPlayShortDeckPokerState:
             self._table.dealer.self_play_deal_river(self._table)
         elif self._betting_stage == "river":
             self._betting_stage = "show_down"
+        elif self._betting_stage in {"show_down", "terminal"}:
+            pass
         else:
-            raise ValueError(f"Cannot increment stage {self._betting_stage}")
+            raise ValueError(f"Unknown betting_stage: {self._betting_stage}")
+        
+    def _move_to_next_player(self):
+        """Ensure state points to next valid active player."""
+        self._player_i_index += 1
+        if self._player_i_index >= len(self.players):
+            self._player_i_index = 0
         
     def _reset_betting_round_state(self):
-        self._n_raises = 0
+        """Reset the state related to counting types of actions."""
+        self._all_players_have_made_action = False
         self._n_actions = 0
+        self._n_raises = 0
         self._player_i_index = 0
-        self._n_players_started_round = sum(
-            1 for player in self.players if player.is_active
-        )
+        self._n_players_started_round = self._poker_engine.n_active_players
+        while not self.current_player.is_active:
+            self._skip_counter += 1
+            self._player_i_index += 1
 
     def set_player_cards(self, player_index: int, cards: List[Card]):
         """Set the private cards for a specific player."""
