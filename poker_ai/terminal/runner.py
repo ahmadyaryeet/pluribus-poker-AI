@@ -431,6 +431,8 @@ def run_self_play_terminal_app(
             else:
                 if agent == "random":
                     action = random.choice(state.legal_actions)
+                    print(f"Random agent choices: {state.legal_actions}")
+                    print(f"Random agent selected: {action}")
                     time.sleep(0.8)
                 elif agent == "offline":
                     default_strategy = {
@@ -445,20 +447,32 @@ def run_self_play_terminal_app(
                         k: v / total for k, v in this_state_strategy.items()
                     }
                     actions = list(this_state_strategy.keys())
-                    probabilties = list(this_state_strategy.values())
-                    action = np.random.choice(actions, p=probabilties)
+                    probabilities = list(this_state_strategy.values())
+                    
+                    print("\nAI decision process:")
+                    print(f"Current betting stage: {state.betting_stage}")
+                    print(f"Legal actions: {actions}")
+                    print("Action probabilities:")
+                    for action, prob in zip(actions, probabilities):
+                        print(f"  {action}: {prob:.4f}")
+                    
+                    action = np.random.choice(actions, p=probabilities)
+                    print(f"Selected action: {action}")
+                    
                     time.sleep(0.8)
                 
                 if action == "raise":
                     action = f"raise:{state.current_raise_amount}"
                 log.info(f"{current_player_name} chose {action}")
+                print(f"Final action taken: {action}")
                 state = state.apply_action(action)
-                
 
             # After applying the action, check if we need to increment the stage
             if state._poker_engine.n_active_players == 1 or (state.all_players_have_actioned and not state._poker_engine.more_betting_needed):
+                print(f"Incrementing stage from {state.betting_stage}")
                 state._increment_stage()
                 state._reset_betting_round_state()
+                print(f"New stage: {state.betting_stage}")
                 continue
 
 
