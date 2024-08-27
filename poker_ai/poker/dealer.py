@@ -1,14 +1,43 @@
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING, Dict
+from typing import List, TYPE_CHECKING
 
 from poker_ai.poker.deck import Deck
+from poker_ai.poker.card import Card
 
 if TYPE_CHECKING:
     from poker_ai.poker.table import PokerTable
     from poker_ai.poker.player import Player
-    from poker_ai.poker.card import Card
 
+# Dictionary to convert rank shortcuts to full names
+rank_conversion = {
+    '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9', '10': '10',
+    'J': 'jack', 'Q': 'queen', 'K': 'king', 'A': 'ace'
+}
+
+# Dictionary to convert suit shortcuts to full names and symbols
+suit_conversion = {
+    'S': ('spades', '♠'),
+    'H': ('hearts', '♥'),
+    'D': ('diamonds', '♦'),
+    'C': ('clubs', '♣')
+}
+
+def convert_shorthand(shorthand: str) -> Card:
+    """Convert shorthand notation to Card object."""
+    if len(shorthand) < 2:
+        raise ValueError("Invalid shorthand notation")
+    
+    rank = shorthand[:-1].upper()
+    suit = shorthand[-1].upper()
+
+    if rank not in rank_conversion or suit not in suit_conversion:
+        raise ValueError("Invalid rank or suit in shorthand notation")
+
+    full_rank = rank_conversion[rank]
+    full_suit, _ = suit_conversion[suit]
+
+    return Card(full_rank, full_suit)
 
 class Dealer:
     """The dealer is in charge of handling the cards on a poker table."""
@@ -62,14 +91,6 @@ class Dealer:
         - List[Card]: A list of Card objects based on user input
         """
         print(f"Enter the cards for the {stage} (format: rank suit, e.g., 'AS KC QH' or '5D KH 2C'):")
-        
-        rank_conversion: Dict[str, str] = {
-            'T': '10', 'J': '11', 'Q': '12', 'K': '13', 'A': '14'
-        }
-        suit_conversion: Dict[str, str] = {
-            'S': 'spades', 'H': 'hearts', 'D': 'diamonds', 'C': 'clubs'
-        }
-
         while True:
             try:
                 user_input = input().upper().split()
@@ -78,16 +99,11 @@ class Dealer:
                 
                 cards = []
                 for card_str in user_input:
-                    if len(card_str) != 2:
-                        raise ValueError(f"Invalid card format: {card_str}. Use format like 'AS' for Ace of Spades.")
-                    rank, suit = card_str[0], card_str[1]
-                    rank = rank_conversion.get(rank, rank)
-                    suit = suit_conversion[suit]
-                    card = Card(int(rank), suit)
+                    card = convert_shorthand(card_str)
                     cards.append(card)
                 
                 return cards
-            except (ValueError, KeyError) as e:
+            except ValueError as e:
                 print(f"Error: {e} Please try again.")
 
     def self_play_deal_private_cards(self, players: List[Player]):
