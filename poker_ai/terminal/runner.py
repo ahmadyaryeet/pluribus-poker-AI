@@ -145,10 +145,10 @@ def run_terminal_app(
             
             # Using the more fine grained preflop strategy would be a good idea
             # for a future improvement
-            if 'pre_flop_strategy' in offline_strategy_dict:
-                del offline_strategy_dict["pre_flop_strategy"]
-            if 'regret' in offline_strategy_dict:
-                del offline_strategy_dict["regret"]
+            ##if 'pre_flop_strategy' in offline_strategy_dict:
+            #    del offline_strategy_dict["pre_flop_strategy"]
+            #if 'regret' in offline_strategy_dict:
+            #    del offline_strategy_dict["regret"]
             
         except Exception as e:
             print(f"Error loading file: {e}")
