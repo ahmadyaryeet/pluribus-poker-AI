@@ -60,7 +60,6 @@ class Deck:
             index: int = len(self._cards_in_deck) - 1
         card: Card = self._cards_in_deck.pop(index)
         self._dealt_cards.append(card)
-        print(card)
         return card
 
     def remove(self, card):
