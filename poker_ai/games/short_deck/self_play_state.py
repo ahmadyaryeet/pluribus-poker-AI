@@ -195,31 +195,27 @@ class SelfPlayShortDeckPokerState:
             A poker state instance that represents the game in the next
             timestep, after the action has been applied.
         """
-        if action_str.split(":")[0] not in self.legal_actions:
+        action = action_str.split(":")[0] if action_str else None
+        if action not in self.legal_actions:
             raise ValueError(
-                f"Action '{action_str}' not in legal actions: " f"{self.legal_actions}"
+                f"Action '{action}' not in legal actions: {self.legal_actions}"
             )
-        # Deep copy the parts of state that are needed that must be immutable
-        # from state to state.
+        
         lut = self.card_info_lut
         self.card_info_lut = {}
         new_state = copy.deepcopy(self)
         new_state.card_info_lut = self.card_info_lut = lut
-        # An action has been made, so alas we are not in the first move of the
-        # current betting round.
         new_state._first_move_of_current_round = False
         raise_action = None
+
         if action_str is None:
-            # Assert active player has folded already.
-            assert (
-                not new_state.current_player.is_active
-            ), "Active player cannot do nothing!"
-        elif action_str == "call":
+            assert not new_state.current_player.is_active, "Active player cannot do nothing!"
+        elif action == "call":
             action = new_state.current_player.call(players=new_state.players)
             logger.debug("calling")
-        elif action_str == "fold":
+        elif action == "fold":
             action = new_state.current_player.fold()
-        elif action_str.startswith("raise"):
+        elif action == "raise":
             bet_n_chips = self.current_raise_amount
             if new_state._betting_stage in {"turn", "river"}:
                 bet_n_chips *= 2
@@ -230,16 +226,8 @@ class SelfPlayShortDeckPokerState:
                     bet_n_chips *= level
                     raise_action = action_str
                 else:
-                    base_bet_n_chips = bet_n_chips
                     custom_bet_n_chips = int(param)
-                    if custom_bet_n_chips > bet_n_chips:
-                        bet_n_chips = custom_bet_n_chips
-                    approximate_level = 1
-                    for level in raise_levels:
-                        if bet_n_chips >= base_bet_n_chips * level:
-                            approximate_level = level
-                    if approximate_level > 1:
-                        raise_action = f"raise:lv{approximate_level}"
+                    bet_n_chips = max(bet_n_chips, custom_bet_n_chips)
             biggest_bet = max(p.n_bet_chips for p in new_state.players)
             n_chips_to_call = biggest_bet - new_state.current_player.n_bet_chips
             raise_n_chips = bet_n_chips + n_chips_to_call
@@ -247,51 +235,35 @@ class SelfPlayShortDeckPokerState:
             action = new_state.current_player.raise_to(n_chips=raise_n_chips)
             new_state._n_raises += 1
         else:
-            raise ValueError(
-                f"Expected action to be derived from class Action, but found "
-                f"type {type(action)}."
-            )
-        # Update the new state.
+            raise ValueError(f"Unexpected action: {action_str}")
+
         skip_actions = ["skip" for _ in range(new_state._skip_counter)]
         new_state._history[new_state.betting_stage] += skip_actions
-        if raise_action is not None:
-            new_state._history[new_state.betting_stage].append(raise_action)
-        else:
-            new_state._history[new_state.betting_stage].append(str(action))
+        new_state._history[new_state.betting_stage].append(action_str if raise_action else str(action))
         new_state._n_actions += 1
         new_state._skip_counter = 0
-        # Player has made move, increment the player that is next.
+
         while True:
             new_state._move_to_next_player()
-            # If we have finished betting, (i.e: All players have put the
-            # same amount of chips in), then increment the stage of
-            # betting.
             finished_betting = not new_state._poker_engine.more_betting_needed
             if finished_betting and new_state.all_players_have_actioned:
-                # We have done atleast one full round of betting, increment
-                # stage of the game.
                 new_state._increment_stage()
                 new_state._reset_betting_round_state()
                 new_state._first_move_of_current_round = True
             if not new_state.current_player.is_active:
                 new_state._skip_counter += 1
-                assert not new_state.current_player.is_active
             elif new_state.current_player.is_broke and self.handle_all_in:
-                # Auto-fold broke players.
                 new_state.current_player.is_active = False
                 new_state._skip_counter += 1
             elif new_state.current_player.is_active:
-                # if new_state._poker_engine.n_players_with_moves == 1:
                 if new_state._poker_engine.n_active_players == 1:
-                    # No players left.
                     new_state._betting_stage = "terminal"
                     if not new_state._table.community_cards:
                         new_state._poker_engine.table.dealer.deal_flop(new_state._table)
-                # Now check if the game is terminal.
                 if new_state._betting_stage in {"terminal", "show_down"}:
-                    # Distribute winnings.
                     new_state._poker_engine.compute_winners()
                 break
+
         for player in new_state.players:
             player.is_turn = False
         new_state.current_player.is_turn = True
@@ -491,7 +463,7 @@ class SelfPlayShortDeckPokerState:
         if self.current_player.is_active:
             actions += ["fold", "call"]
             if self._n_raises < self.raise_limit:
-                actions += [f"raise:{self.current_raise_amount}"]
+                actions += ["raise"]
         else:
             actions += [None]
         return actions

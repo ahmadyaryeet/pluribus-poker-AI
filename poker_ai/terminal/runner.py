@@ -332,7 +332,6 @@ def run_self_play_terminal_app(
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
         while True:
-            # Check if we need to deal community cards
             if state.needs_card_input():
                 state.input_cards()
                 continue
@@ -425,8 +424,10 @@ def run_self_play_terminal_app(
                         if n_table_rotations < 0:
                             n_table_rotations = n_players - 1
                     else:
+                        if action == "raise":
+                            action = f"raise:{state.current_raise_amount}"
                         log.info(term.green(f"{current_player_name} chose {action}"))
-                        state: SelfPlayShortDeckPokerState = state.apply_action(action)
+                        state = state.apply_action(action)
             else:
                 if agent == "random":
                     action = random.choice(state.legal_actions)
@@ -448,13 +449,17 @@ def run_self_play_terminal_app(
                     action = np.random.choice(actions, p=probabilties)
                     time.sleep(0.8)
                 
+                if action == "raise":
+                    action = f"raise:{state.current_raise_amount}"
                 log.info(f"{current_player_name} chose {action}")
-                state: SelfPlayShortDeckPokerState = state.apply_action(action)
+                state = state.apply_action(action)
+                
 
             # After applying the action, check if we need to increment the stage
             if state._poker_engine.n_active_players == 1 or (state.all_players_have_actioned and not state._poker_engine.more_betting_needed):
                 state._increment_stage()
                 state._reset_betting_round_state()
+                continue
 
 
 def select_runner():
