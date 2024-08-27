@@ -531,8 +531,8 @@ def run_progress_checker(
 
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {
-        "top-left": "Current AI 1", "top-middle": "Previous AI 1", "top-right": "Current AI 2",
-        "bottom-left": "Previous AI 2", "bottom-middle": "Current AI 3", "bottom-right": "Previous AI 3"
+        "top-left": "Current AI 1", "top-middle": "Current AI 2", "top-right": "Current AI 3",
+        "bottom-left": "Current AI 4", "bottom-middle": "Current AI 5", "bottom-right": "Previous AI 1"
     }
 
     n_players = 6
