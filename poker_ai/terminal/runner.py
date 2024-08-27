@@ -530,8 +530,10 @@ def run_progress_checker(
     )
 
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
-    names = {"top-left": "Previous AI", "top-middle": "Previous AI", "top-right": "Previous AI", 
-             "bottom-left": "Previous AI", "bottom-middle": "Previous AI", "bottom-right": "Current AI"}
+    names = {
+        "top-left": "Current AI 1", "top-middle": "Current AI 2", "top-right": "Current AI 3",
+        "bottom-left": "Previous AI 1", "bottom-middle": "Previous AI 2", "bottom-right": "Previous AI 3"
+    }
 
     n_players = 6
     user_results: UserResults = UserResults()
@@ -559,7 +561,7 @@ def run_progress_checker(
             while not state.is_terminal:
                 hands_this_game += 1
                 og_current_name = state.current_player.name
-                is_current_ai = names[positions[state.players.index(state.current_player)]] == "Current AI"
+                is_current_ai = "Current AI" in names[positions[state.players.index(state.current_player)]]
 
                 strategy = current_strategy if is_current_ai else previous_strategy
 
@@ -580,14 +582,14 @@ def run_progress_checker(
             
             # Update statistics
             for player in state.players:
-                if names[positions[state.players.index(player)]] == "Current AI":
+                if "Current AI" in names[positions[state.players.index(player)]]:
                     if player.n_chips > 0:
                         current_ai_wins += 1
                     current_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
                 else:
                     if player.n_chips > 0:
                         previous_ai_wins += 1
-                    previous_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000
+                    previous_ai_money += player.n_chips - 10000  # Assuming starting chips is 10000  # Assuming starting chips is 10000
 
         # Print progress after each reset
         games_played = (reset_count + 1) * games_per_reset
