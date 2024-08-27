@@ -511,13 +511,16 @@ class SelfPlayShortDeckPokerState:
         """Once betting has finished, increment the stage of the poker game."""
         if self._betting_stage == "pre_flop":
             self._betting_stage = "flop"
-            self._table.dealer.self_play_deal_flop(self._table)
+            # Remove the automatic dealing of flop cards
+            # self._table.dealer.self_play_deal_flop(self._table)
         elif self._betting_stage == "flop":
             self._betting_stage = "turn"
-            self._table.dealer.self_play_deal_turn(self._table)
+            # Remove the automatic dealing of turn card
+            # self._table.dealer.self_play_deal_turn(self._table)
         elif self._betting_stage == "turn":
             self._betting_stage = "river"
-            self._table.dealer.self_play_deal_river(self._table)
+            # Remove the automatic dealing of river card
+            # self._table.dealer.self_play_deal_river(self._table)
         elif self._betting_stage == "river":
             self._betting_stage = "show_down"
         elif self._betting_stage in {"show_down", "terminal"}:

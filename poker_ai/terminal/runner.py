@@ -304,8 +304,6 @@ def run_self_play_terminal_app(
     selected_action_i: int = 0
     positions = ["top-left", "top-middle", "top-right", "bottom-left", "bottom-middle", "bottom-right"]
     names = {"top-left": "BOT 1", "top-middle": "BOT 2", "top-right": "BOT 3", "bottom-left": "BOT 4", "bottom-middle": "BOT 5", "bottom-right": "HUMAN"}
-    
-    
 
     if not debug_quick_start and agent in {"offline", "online"}:
         print("Pre loading")
@@ -334,15 +332,18 @@ def run_self_play_terminal_app(
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
         while True:
+            # Check if we need to deal community cards
+            if state._betting_stage == "flop" and not state._table.community_cards:
+                state._table.dealer.self_play_deal_flop(state._table)
+            elif state._betting_stage == "turn" and len(state._table.community_cards) == 3:
+                state._table.dealer.self_play_deal_turn(state._table)
+            elif state._betting_stage == "river" and len(state._table.community_cards) == 4:
+                state._table.dealer.self_play_deal_river(state._table)
+
             ascii_players: Dict[str, AsciiPlayer] = {}
             state_players = rotate_list(state.players[::-1], n_table_rotations)
             og_name_to_position = {}
             og_name_to_name = {}
-
-            if state._poker_engine.n_active_players == 1:
-                state._betting_stage = "terminal"
-                if not state._table.community_cards:
-                    state._poker_engine.table.dealer.self_play_deal_flop(state._table)
             for player_i, player in enumerate(state_players):
                 position = positions[player_i]
                 is_human = names[position].lower() == "human"
@@ -445,8 +446,14 @@ def run_self_play_terminal_app(
                     probabilties = list(this_state_strategy.values())
                     action = np.random.choice(actions, p=probabilties)
                     time.sleep(0.8)
+                
                 log.info(f"{current_player_name} chose {action}")
                 state: SelfPlayShortDeckPokerState = state.apply_action(action)
+
+            # After applying the action, check if we need to increment the stage
+            if state._poker_engine.n_active_players == 1 or (state.all_players_have_actioned and not state._poker_engine.more_betting_needed):
+                state._increment_stage()
+                state._reset_betting_round_state()
 
 
 def select_runner():
