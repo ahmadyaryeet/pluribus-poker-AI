@@ -125,7 +125,7 @@ def update_strategy(
             update_strategy(agent, new_state, i, t, locks)
 
 def log_training_metrics(agent, iteration):
-    if iteration % 500 == 0:  # Log every 1000 iterations
+    if iteration % 100 == 0:  # Log every 1000 iterations
         avg_regret = sum(abs(r) for regrets in agent.regret.values() for r in regrets.values()) / len(agent.regret)
         log_to_console(f"Iteration {iteration}: Average absolute regret: {avg_regret}")
 
