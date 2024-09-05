@@ -121,7 +121,7 @@ class Server:
                     )
                 self.job("cfr", sync_workers=self._sync_cfr, t=t, i=i)
             current_iteration = self.increment_iteration()
-            self.log_training_metrics(self._agent, current_iteration)
+            log_training_metrics(self._agent, current_iteration)
             if t < self._lcfr_threshold & t % self._discount_interval == 0:
                 self.job("discount", sync_workers=self._sync_discount, t=t)
             if t > self._update_threshold and t % self._dump_iteration == 0:
