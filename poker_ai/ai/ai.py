@@ -34,22 +34,22 @@ def calculate_strategy(this_info_sets_regret: Dict[str, float]) -> Dict[str, flo
     strategy : Dict[str, float]
         Strategy as a probability over actions.
     """
-    log_to_console(f"Calculating strategy for info set regret: {this_info_sets_regret}")
+    #log_to_console(f"Calculating strategy for info set regret: {this_info_sets_regret}")
     
     actions = this_info_sets_regret.keys()
     regret_sum = sum([max(regret, 0) for regret in this_info_sets_regret.values()])
     
-    log_to_console(f"Regret sum: {regret_sum}")
+    #log_to_console(f"Regret sum: {regret_sum}")
     
     if regret_sum > 0:
         strategy = {
             action: max(this_info_sets_regret[action], 0) / regret_sum
             for action in actions
         }
-        log_to_console(f"Calculated strategy (regret sum > 0): {strategy}")
+        #log_to_console(f"Calculated strategy (regret sum > 0): {strategy}")
     else:
         strategy = {action: 1.0 / len(actions) for action in actions}
-        log_to_console(f"Using default strategy (regret sum <= 0): {strategy}")
+        #log_to_console(f"Using default strategy (regret sum <= 0): {strategy}")
     
     return strategy
 
