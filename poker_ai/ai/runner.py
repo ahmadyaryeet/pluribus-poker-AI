@@ -168,7 +168,7 @@ def resume(server_config_path: str, additional_iterations: int):
 )
 @click.option(
     "--strategy_interval",
-    default=40,
+    default=20,
     help="Update the current strategy whenever the iteration % strategy_interval == 0.",
 )
 @click.option(
@@ -179,7 +179,7 @@ def resume(server_config_path: str, additional_iterations: int):
 )
 @click.option(
     "--lcfr_threshold",
-    default=1000,
+    default=100,
     #default=150,
     help=(
         "A threshold for linear CFR which means don't apply discounting "
@@ -226,7 +226,7 @@ def resume(server_config_path: str, additional_iterations: int):
 @click.option(
     "--update_threshold",
     #default=150,
-    default=1000,
+    default=100,
     help=(
         "When the iteration is greater than update_threshold we can start "
         "updating the strategy."
