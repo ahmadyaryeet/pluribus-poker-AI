@@ -95,16 +95,21 @@ def train():
     default="./server.gz",
     help="The path to the previous server.gz file from a previous study.",
 )
-def resume(server_config_path: str):
+@click.option(
+    "--additional_iterations",
+    default=1000,
+    help="Number of additional iterations to train.",
+)
+def resume(server_config_path: str, additional_iterations: int):
     """
     Continue training agent from config loaded from file.
-
-    ...
 
     Parameters
     ----------
     server_config_path : str
         Path to server configurations.
+    additional_iterations : int
+        Number of additional iterations to train.
     """
     try:
         config = joblib.load(server_config_path)
@@ -114,6 +119,30 @@ def resume(server_config_path: str):
             f"Server config file not found at the path: {server_config_path}\n "
             f"Please set the path to a valid file dumped by a previous session."
         )
+    
+    # Adjust parameters for continued training
+    config['n_iterations'] += additional_iterations
+    config['start_timestep'] = config.get('n_iterations', 0) - additional_iterations + 1
+    config['lcfr_threshold'] = max(config.get('lcfr_threshold', 0), config['start_timestep'] + 100)
+    config['update_threshold'] = min(config.get('update_threshold', float('inf')), config['start_timestep'] - 100)
+    config['dump_iteration'] = 200  # Dump at least 10 times during additional training
+    config['discount_interval'] = min(config.get('discount_interval', float('inf')), additional_iterations // 5)
+    
+    # Ensure we're using the full deck and all players
+    config['low_card_rank'] = 2
+    config['high_card_rank'] = 14
+    config['n_players'] = 6
+    
+    # Enable multiprocessing and synchronization for stability
+    config['single_process'] = False
+    config['sync_update_strategy'] = True
+    config['sync_cfr'] = True
+    config['sync_discount'] = True
+    config['sync_serialise'] = True
+    
+    log.info(f"Resuming training for {additional_iterations} more iterations")
+    log.info(f"Updated config: {config}")
+    
     server = Server.from_dict(config)
     _safe_search(server)
 
@@ -139,7 +168,7 @@ def resume(server_config_path: str):
 )
 @click.option(
     "--strategy_interval",
-    default=20,
+    default=40,
     help="Update the current strategy whenever the iteration % strategy_interval == 0.",
 )
 @click.option(
