@@ -4,6 +4,9 @@ import os
 import time
 from pathlib import Path
 from typing import Dict, Optional, Union, List
+from poker_ai.ai.multiprocess.worker import log_to_console
+from poker_ai.ai.ai import log_training_metrics  # Adjust the import path as necessary
+import threading
 
 import enlighten
 
@@ -43,6 +46,7 @@ class Server:
         sync_serialise: bool = False,
         start_timestep: int = 1,
         n_processes: int = max(mp.cpu_count() - 10, 4),
+        
     ):
         """Set up the optimisation server."""
         self._include_ranks = include_ranks
@@ -79,6 +83,14 @@ class Server:
         if os.environ.get("TESTING_SUITE"):
             n_processes = 4
         self._workers: Dict[str, Worker] = self._start_workers(n_processes)
+        self._global_iteration = 0
+        self._iteration_lock = threading.Lock()
+
+    def increment_iteration(self):
+        with self._iteration_lock:
+            self._global_iteration += 1
+            return self._global_iteration
+    
 
     def search(self):
         """Perform MCCFR and train the agent.
@@ -109,6 +121,8 @@ class Server:
                         i=i,
                     )
                 self.job("cfr", sync_workers=self._sync_cfr, t=t, i=i)
+            current_iteration = self.increment_iteration()
+            self.log_training_metrics(self._agent, current_iteration)
             if t < self._lcfr_threshold & t % self._discount_interval == 0:
                 self.job("discount", sync_workers=self._sync_discount, t=t)
             if t > self._update_threshold and t % self._dump_iteration == 0:
@@ -118,6 +132,7 @@ class Server:
                     t=t,
                     server_state=self.to_dict(),
                 )
+            
             progress_bar.update()
 
     def terminate(self, safe: bool = False):
