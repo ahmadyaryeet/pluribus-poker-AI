@@ -123,16 +123,12 @@ def resume(server_config_path: str, additional_iterations: int):
     # Adjust parameters for continued training
     config['n_iterations'] += additional_iterations
     config['start_timestep'] = config.get('n_iterations', 0) - additional_iterations + 1
-    config['lcfr_threshold'] = max(config.get('lcfr_threshold', 0), config['start_timestep'] + 100)
+    config['lcfr_threshold'] = config.get('lcfr_threshold', 0)
     config['update_threshold'] = min(config.get('update_threshold', float('inf')), config['start_timestep'] - 100)
     config['dump_iteration'] = 200  # Dump at least 10 times during additional training
     config['discount_interval'] = min(config.get('discount_interval', float('inf')), additional_iterations // 5)
     
     # Ensure we're using the full deck and all players
-    config['low_card_rank'] = 2
-    config['high_card_rank'] = 14
-    config['n_players'] = 6
-    
     # Enable multiprocessing and synchronization for stability
     config['single_process'] = False
     config['sync_update_strategy'] = True
