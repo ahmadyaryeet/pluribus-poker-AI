@@ -129,12 +129,7 @@ def resume(server_config_path: str, additional_iterations: int):
     config['discount_interval'] = min(config.get('discount_interval', float('inf')), additional_iterations // 5)
     
     # Ensure we're using the full deck and all players
-    # Enable multiprocessing and synchronization for stability
-    config['single_process'] = False
-    config['sync_update_strategy'] = True
-    config['sync_cfr'] = True
-    config['sync_discount'] = True
-    config['sync_serialise'] = True
+
     
     log.info(f"Resuming training for {additional_iterations} more iterations")
     log.info(f"Updated config: {config}")
