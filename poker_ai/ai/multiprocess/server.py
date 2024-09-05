@@ -4,7 +4,6 @@ import os
 import time
 from pathlib import Path
 from typing import Dict, Optional, Union, List
-from poker_ai.ai.multiprocess.worker import log_to_console
 from poker_ai.ai.ai import log_training_metrics  # Adjust the import path as necessary
 import threading
 
