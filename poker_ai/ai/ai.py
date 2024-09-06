@@ -128,17 +128,24 @@ def update_strategy(
             update_strategy(agent, new_state, i, t, locks)
 
 def log_training_metrics(agent, iteration):
-    if iteration % 50 == 0:  # Log every 1000 iterations
-        avg_regret = sum((r) for regrets in agent.regret.values() for r in regrets.values()) / len(agent.regret)
-        log_to_console(f"Iteration {iteration}: Average absolute regret: {avg_regret}")
+    if iteration % 50 == 0:  # Log every 50 iterations
+        positive_regrets = sum(max(r, 0) for regrets in agent.regret.values() for r in regrets.values())
+        negative_regrets = sum(min(r, 0) for regrets in agent.regret.values() for r in regrets.values())
+        total_info_sets = len(agent.regret)
+        
+        log_to_console(f"Iteration {iteration}:")
+        log_to_console(f"  Sum of positive regrets: {positive_regrets:.2f}")
+        log_to_console(f"  Sum of negative regrets: {negative_regrets:.2f}")
+        log_to_console(f"  Average positive regret: {positive_regrets / total_info_sets:.2f}")
+        log_to_console(f"  Average negative regret: {negative_regrets / total_info_sets:.2f}")
 
         total_entropy = 0
         for info_set, regrets in agent.regret.items():
             strategy = calculate_strategy(regrets)
             entropy = -sum(p * np.log2(p) for p in strategy.values() if p > 0)
             total_entropy += entropy
-        avg_entropy = total_entropy / len(agent.regret)
-        log_to_console(f"Iteration {iteration}: Average strategy entropy: {avg_entropy}")
+        avg_entropy = total_entropy / total_info_sets
+        log_to_console(f"  Average strategy entropy: {avg_entropy:.4f}")
 
 def cfr(
     agent: Agent,
