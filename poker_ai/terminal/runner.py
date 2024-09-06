@@ -83,7 +83,7 @@ def run_terminal_app(
     lut_path: str,
     pickle_dir: bool,
     agent: str = "offline",
-    strategy_path: str = "/_2024_08_09_18_55_49_280081/agent.joblib",
+    strategy_path: str = "./_2024_08_09_18_55_49_280081/agent.joblib",
     previous_strategy_path: str = "",
     debug_quick_start: bool = False
 ):
