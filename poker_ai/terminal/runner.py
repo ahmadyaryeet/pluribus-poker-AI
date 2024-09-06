@@ -132,16 +132,15 @@ def run_terminal_app(
     if not debug_quick_start and agent in {"offline", "online"}:
         print("Pre loading")
         print_memory_usage()
-        try:
-            offline_strategy_dict = joblib.load(strategy_path)
-            print("Strategy loaded successfully")
-            print("Keys in loaded data:", offline_strategy_dict.keys())
-            
-            if 'strategy' in offline_strategy_dict:
-                offline_strategy = offline_strategy_dict['strategy']
-            else:
-                print("'strategy' key not found. Using entire loaded data as strategy.")
-                offline_strategy = offline_strategy_dict
+        
+        offline_strategy_dict = joblib.load(strategy_path)
+        print("Strategy loaded successfully")
+        
+        if 'strategy' in offline_strategy_dict:
+            offline_strategy = offline_strategy_dict['strategy']
+        else:
+            print("'strategy' key not found. Using entire loaded data as strategy.")
+            offline_strategy = offline_strategy_dict
             
             # Using the more fine grained preflop strategy would be a good idea
             # for a future improvement
@@ -150,8 +149,7 @@ def run_terminal_app(
             #if 'regret' in offline_strategy_dict:
             #    del offline_strategy_dict["regret"]
             
-        except Exception as e:
-            print(f"Error loading file: {e}")
+    
         print_memory_usage()
         print("post Loading")
 
