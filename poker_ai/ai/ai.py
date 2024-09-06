@@ -9,7 +9,7 @@ import sys
 
 import joblib
 import numpy as np
-import threading
+
 
 from poker_ai.ai.agent import Agent
 from poker_ai.games.short_deck.state import ShortDeckPokerState
@@ -17,15 +17,6 @@ from poker_ai.games.short_deck.state import ShortDeckPokerState
 
 log = logging.getLogger("sync.ai")
 
-
-global_iteration = 0
-iteration_lock = threading.Lock()
-
-def increment_iteration():
-    global global_iteration
-    with iteration_lock:
-        global_iteration += 1
-        return global_iteration
 
 def log_to_console(message):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -138,7 +129,7 @@ def update_strategy(
 
 def log_training_metrics(agent, iteration):
     if iteration % 50 == 0:  # Log every 1000 iterations
-        avg_regret = sum(abs(r) for regrets in agent.regret.values() for r in regrets.values()) / len(agent.regret)
+        avg_regret = sum((r) for regrets in agent.regret.values() for r in regrets.values()) / len(agent.regret)
         log_to_console(f"Iteration {iteration}: Average absolute regret: {avg_regret}")
 
         total_entropy = 0
