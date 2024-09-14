@@ -22,8 +22,8 @@ from poker_ai.poker.table import PokerTable
 logger = logging.getLogger("poker_ai.games.short_deck.state")
 InfoSetLookupTable = Dict[str, Dict[Tuple[int, ...], str]]
 # raise_levels = [2, 3, 5, 10, 20, 40, 60, 80, 100]
-raise_levels = [2, 5, 10, 50]
-#raise_levels = [2, 5, 50]
+#raise_levels = [2, 5, 10, 50]
+raise_levels = [2, 5, 50]
 
 
 def new_game(
