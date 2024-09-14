@@ -502,10 +502,10 @@ def select_runner():
         run_self_play_terminal_app(
             low_card_rank=2,
             high_card_rank=14,
-            lut_path="lut://0.0.0.0:8989",
+            lut_path="lut://127.0.0.1:8989",
             pickle_dir=False,
             agent="offline",
-            strategy_path="./_2024_08_10_01_29_30_879636/agent.joblib",
+            strategy_path="./rust_poker_ai/_2024_08_22_14_22_03_700884/agent.joblib",
             debug_quick_start=False
         )
     
