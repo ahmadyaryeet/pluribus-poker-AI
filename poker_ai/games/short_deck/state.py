@@ -22,7 +22,7 @@ from poker_ai.poker.table import PokerTable
 logger = logging.getLogger("poker_ai.games.short_deck.state")
 InfoSetLookupTable = Dict[str, Dict[Tuple[int, ...], str]]
 # raise_levels = [2, 3, 5, 10, 20, 40, 60, 80, 100]
-raise_levels = [2, 3, 5, 10, 30, 50]
+raise_levels = [2, 5, 10, 50]
 #raise_levels = [2, 5, 50]
 
 
@@ -492,7 +492,6 @@ class ShortDeckPokerState:
                 if self.betting_stage not in {"terminal", "show_down"}:
                     raise ValueError("You should have these cards in your lut.")
                 print("You should have these cards in your lut, meaning you do not")
-                time.sleep(0.8)
                 return "default info set, please ensure you load it correctly"
         else:
             cards_cluster = 1
