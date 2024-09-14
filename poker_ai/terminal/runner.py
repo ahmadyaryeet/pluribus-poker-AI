@@ -77,31 +77,6 @@ def load_strategy(strategy_path):
 @click.option('--strategy_path', required=False, default="", type=str)
 @click.option('--previous_strategy_path', required=False, default="", type=str)
 @click.option('--debug_quick_start/--no_debug_quick_start', default=False)
-def select_runner():
-    user_input = input("Type '1' if you want to play against the AI, Type '2' if you want the AI to play against a previous version of itself, Type '3' for Self online play: ")
-    if user_input == '1':
-        run_terminal_app()
-    elif user_input == '2':
-        run_progress_checker(
-            low_card_rank=2,
-            high_card_rank=14,
-            lut_path="lut://0.0.0.0:8989",
-            pickle_dir=False,
-            agent="offline",
-            strategy_path="./_2024_08_10_01_29_30_879636/agent.joblib",
-            previous_strategy_path="./_2024_08_16_05_59_24_726841/agent.joblib",
-            debug_quick_start=False
-        )
-    elif user_input == '3':
-        run_self_play_terminal_app(
-            low_card_rank=2,
-            high_card_rank=14,
-            lut_path="lut://127.0.0.1:8989",
-            pickle_dir=False,
-            agent="offline",
-            strategy_path="./rust_poker_ai/_2024_08_22_14_22_03_700884/agent.joblib",
-            debug_quick_start=False
-        )
 def run_terminal_app(
     low_card_rank: int,
     high_card_rank: int,
@@ -508,7 +483,32 @@ def run_self_play_terminal_app(
                 continue
 
 
-
+def select_runner():
+    user_input = input("Type '1' if you want to play against the AI, Type '2' if you want the AI to play against a previous version of itself, Type '3' for Self online play: ")
+    if user_input == '1':
+        run_terminal_app()
+    elif user_input == '2':
+        run_progress_checker(
+            low_card_rank=2,
+            high_card_rank=14,
+            lut_path="lut://0.0.0.0:8989",
+            pickle_dir=False,
+            agent="offline",
+            strategy_path="./_2024_08_10_01_29_30_879636/agent.joblib",
+            previous_strategy_path="./_2024_08_16_05_59_24_726841/agent.joblib",
+            debug_quick_start=False
+        )
+    elif user_input == '3':
+        run_self_play_terminal_app(
+            low_card_rank=2,
+            high_card_rank=14,
+            lut_path="lut://127.0.0.1:8989",
+            pickle_dir=False,
+            agent="offline",
+            strategy_path="./rust_poker_ai/_2024_08_22_14_22_03_700884/agent.joblib",
+            debug_quick_start=False
+        )
+    
 def run_progress_checker(
     low_card_rank: int,
     high_card_rank: int,
