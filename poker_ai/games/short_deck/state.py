@@ -490,6 +490,7 @@ class ShortDeckPokerState:
             except KeyError:
                 if self.betting_stage not in {"terminal", "show_down"}:
                     raise ValueError("You should have these cards in your lut.")
+                print("You should have these cards in your lut, meaning you do not")
                 return "default info set, please ensure you load it correctly"
         else:
             cards_cluster = 1
