@@ -5,6 +5,7 @@ import copy
 import json
 import logging
 import operator
+import time
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -491,6 +492,7 @@ class ShortDeckPokerState:
                 if self.betting_stage not in {"terminal", "show_down"}:
                     raise ValueError("You should have these cards in your lut.")
                 print("You should have these cards in your lut, meaning you do not")
+                time.sleep(0.8)
                 return "default info set, please ensure you load it correctly"
         else:
             cards_cluster = 1
