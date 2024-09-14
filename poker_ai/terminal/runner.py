@@ -153,6 +153,16 @@ def run_terminal_app(
         print_memory_usage()
         print("post Loading")
 
+    def start_new_game():
+        if debug_quick_start:
+            return new_game(n_players, {}, load_card_lut=False, include_ranks=include_ranks)
+        else:
+            return new_game(n_players, {}, include_ranks=include_ranks)
+    
+    state: ShortDeckPokerState = start_new_game()
+    n_table_rotations: int = 0
+    selected_action_i: int = 0
+
     user_results: UserResults = UserResults()
     with term.cbreak(), term.hidden_cursor():
         while True:
@@ -227,28 +237,19 @@ def run_terminal_app(
                         log.info(term.pink("quit"))
                         break
                     elif action == "new game":
-                        user_results.add_result(strategy_path, agent, state, og_name_to_name)
                         log.clear()
-                        log.info(term.green("new game"))
-                        include_ranks = list(range(low_card_rank, high_card_rank + 1))
-                        if debug_quick_start:
-                            state: ShortDeckPokerState = new_game(
-                                n_players, state.card_info_lut, load_card_lut=False, include_ranks=include_ranks,
-                            )
-                        else:
-                            state: ShortDeckPokerState = new_game(
-                                n_players, state.card_info_lut, include_ranks=include_ranks,
-                            )
+                        log.info(term.green("Starting new game"))
+                        state: ShortDeckPokerState = start_new_game()
                         n_table_rotations -= 1
                         if n_table_rotations < 0:
                             n_table_rotations = n_players - 1
                     else:
                         log.info(term.green(f"{current_player_name} chose {action}"))
-                        state: ShortDeckPokerState = state.apply_action(action)
+                        state = state.apply_action(action)
             else:
                 if agent == "random":
                     action = random.choice(state.legal_actions)
-                    time.sleep(0.8)
+                    time.sleep(0.8)  # You can keep this short delay for random AI if needed
                 elif agent == "offline":
                     default_strategy = {
                         action: 1 / len(state.legal_actions)
@@ -263,18 +264,22 @@ def run_terminal_app(
                         k: v / total for k, v in this_state_strategy.items()
                     }
                     actions = list(this_state_strategy.keys())
-                    probabilties = list(this_state_strategy.values())
+                    probabilities = list(this_state_strategy.values())
 
                     print("\nAI decision process:")
                     print(f"Current betting stage: {state.betting_stage}")
                     print(f"Legal actions: {actions}")
                     print("Action probabilities:")
-                    for action, prob in zip(actions, probabilties):
+                    for action, prob in zip(actions, probabilities):
                         print(f"  {action}: {prob:.4f}")
                     
-                    action = np.random.choice(actions, p=probabilties)
+                    action = np.random.choice(actions, p=probabilities)
                     print(f"Selected action: {action}")
-                    time.sleep(5.0)
+
+                    # Wait for user to press any key before proceeding
+                    print("Press any key to continue...")
+                    term.inkey(timeout=None)  # Blocks until a key is pressed
+
                 log.info(f"{current_player_name} chose {action}")
                 state: ShortDeckPokerState = state.apply_action(action)
 
