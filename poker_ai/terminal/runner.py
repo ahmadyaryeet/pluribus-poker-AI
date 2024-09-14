@@ -258,6 +258,9 @@ def run_terminal_app(
                     this_state_strategy = offline_strategy.get(
                         state.info_set, default_strategy
                     )
+
+                    strategy_type = "offline_strategy" if state.info_set in offline_strategy else "default_strategy"
+                    print(f"\nUsing {strategy_type}")
                     # Normalizing strategy.
                     total = sum(this_state_strategy.values())
                     this_state_strategy = {
